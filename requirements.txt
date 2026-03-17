@@ -1,0 +1,59 @@
+# ── Backend (Python / FastAPI) ────────────────────────────────────────────────
+
+# FastAPI and server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+gunicorn>=21.2.0
+apscheduler>=3.10.4
+
+# Database
+sqlalchemy>=2.0.23
+pg8000>=1.30.3
+alembic>=1.12.1
+
+# Data processing
+pandas>=1.5.0
+numpy>=1.21.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Validation
+pydantic>=2.5.0
+email-validator>=2.1.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# Authentication
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.0.1
+
+# AI
+openai>=1.0.0
+
+# File uploads
+python-multipart>=0.0.6
+
+
+# ── Frontend (Node.js / Next.js) ──────────────────────────────────────────────
+# Install with: cd frontend && npm install
+#
+# dependencies:
+#   @tanstack/react-query ^5.90.12
+#   axios                 ^1.13.2
+#   lucide-react          ^0.562.0
+#   next                  14.2.5
+#   react                 18.2.0
+#   react-dom             18.2.0
+#   recharts              ^3.6.0
+#
+# devDependencies:
+#   @tailwindcss/postcss  ^4
+#   @types/node           ^20
+#   @types/react          ^18
+#   @types/react-dom      ^18
+#   eslint                8.57.0
+#   eslint-config-next    14.2.5
+#   tailwindcss           ^4
+#   typescript            ^5

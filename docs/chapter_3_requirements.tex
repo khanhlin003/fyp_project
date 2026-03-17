@@ -1,0 +1,207 @@
+\chapter{System Requirements and Design}
+
+\section{Primary Users}
+
+The primary users of the AI-Assisted ETFs Recommendation Platform are retail investors with beginner to intermediate financial knowledge, seeking long-term wealth accumulation through diversified ETFs without frequent trading. They face challenges such as information overload, difficulty interpreting risk metrics, and limited access to personalized investment guidance, and therefore need a simplified, educational platform that provides risk-aware recommendations, clear explanations, and intuitive visualizations.
+
+\section{Use Case}
+
+Figure~\ref{fig:usecase} presents the high-level use case diagram illustrating the interactions between users and the system.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/use_case_diagram.png}
+    \caption{Use Case Diagram}
+    \label{fig:usecase}
+\end{figure}
+
+Detailed use case specifications, including preconditions, main flows, and exception flows, are provided in \textbf{Appendix A}.
+
+\section{Functional Requirements}
+
+The functional requirements specify the core functionalities of the AI-Assisted ETF Recommendation Platform.
+
+\textbf{User Authentication and Profile Management}
+\begin{itemize}
+    \item The system shall allow users to register using an email address and password.
+    \item The system shall allow users to log in securely to access personalized features.
+    \item The system shall allow users to update their personal profile information.
+\end{itemize}
+
+\textbf{Risk Assessment}
+\begin{itemize}
+    \item The system shall provide a risk profiling questionnaire to assess user risk tolerance.
+    \item The system shall calculate a numerical risk score based on user responses.
+    \item The system shall assign users to a predefined risk category (e.g., Conservative, Moderate, Aggressive).
+\end{itemize}
+
+\textbf{ETF Discovery and Analysis}
+\begin{itemize}
+    \item The system shall allow users to search ETFs by ticker or name.
+    \item The system shall allow users to filter ETFs based on asset class, region, and expense ratio.
+    \item The system shall display detailed ETF information including historical price data and key risk metrics.
+\end{itemize}
+
+\textbf{Personalized Recommendations}
+\begin{itemize}
+    \item The system shall generate ETF recommendations aligned with the user’s risk profile.
+    \item The system shall rank recommended ETFs using a multi-factor scoring approach.
+    \item The system shall provide explanations for the generated recommendations.
+\end{itemize}
+
+\textbf{Portfolio Management}
+\begin{itemize}
+    \item The system shall allow users to create and manage ETF portfolios.
+    \item The system shall visualize portfolio asset allocation and performance.
+    \item The system shall conduct portfolio risk analysis, including stress testing and Value at Risk (VaR).
+\end{itemize}
+
+\textbf{AI Assistance and News}
+\begin{itemize}
+    \item The system shall provide an AI-powered chatbot to answer ETF-related queries.
+    \item The system shall display ETF-related news and sentiment analysis.
+    \item The system shall include a financial disclaimer in all AI-generated responses.
+\end{itemize}
+
+
+
+
+\section{Non-Functional Requirements}
+
+The system must meet the following non-functional requirements to ensure performance, reliability, security, and usability:
+
+\begin{itemize}
+    \item \textbf{Performance:} API responses for read requests shall be under 500ms. Frontend first contentful paint (FCP) shall be under 1.5 seconds.
+    \item \textbf{Scalability:} The database shall support millions of price records without significant query degradation.
+    \item \textbf{Security:} Passwords shall be hashed; all data in transit shall be encrypted; API keys shall be stored securely on the server side.
+    \item \textbf{Reliability:} Background tasks (e.g., data ingestion) shall handle API rate limits and retry on failure.
+    \item \textbf{Usability:} The interface shall be responsive across mobile, tablet, and desktop devices.
+\end{itemize}
+
+\section{System Architecture}
+
+The platform follows a modern three-tier architecture:
+
+\begin{itemize}
+    \item \textbf{Presentation Layer (Frontend):} Built with Next.js (React), TypeScript, and Tailwind CSS for responsive and consistent UI.
+    \item \textbf{Application Layer (Backend):} FastAPI (Python) handles business logic, multi-factor recommendation, and AI integration.
+    \item \textbf{Data Layer (Database):} PostgreSQL stores metadata, time-series price data, news sentiment, and portfolio information.
+    \item \textbf{External Integrations:} OpenAI API for AI chatbot, Alpha Vantage for market news and macro data, Yahoo Finance for historical price data.
+\end{itemize}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/system_architecture.png}
+    \caption{System Architecture}
+    \label{fig:system-arch}
+\end{figure}
+
+
+\section{Database Design}
+
+The database schema ensures relational integrity, supports time-series financial data, and facilitates sentiment analysis. It is normalized for data consistency and complex queries across market dimensions:
+
+\begin{itemize}
+    \item Users and Quiz Results: The \texttt{users} table manages secure authentication and links to \texttt{quiz\_results}, recording responses for risk profiling.
+    \item ETFs (Master Data): The \texttt{etfs} table stores ETF metadata including expense ratios, AUM, dividends, and technical indicators.
+    \item ETF Prices: The \texttt{etf\_prices} table maintains historical OHLCV data linked to \texttt{etfs} for time-series analysis.
+    \item Portfolios: Records user holdings with quantity, purchase price, and date.
+    \item News and Sentiment: \texttt{news} stores articles and \texttt{news\_tickers} maps them to tickers for sentiment scoring.
+    \item Macro Indicators: Tracks key economic metrics like GDP, interest rates, and CPI for recommendations.
+\end{itemize}
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/entity_relationship_diagram.png}
+    \caption{Entity-Relationship Diagram}
+    \label{fig:erd}
+\end{figure}
+
+
+\section{API Design}
+
+The system is built as a RESTful API using FastAPI, following a stateless architecture. All endpoints return data in JSON format and are protected via HTTPS. Authentication is handled using JWT tokens with a 7-day validity period. Rate limiting is enforced at 60 requests/minute for public endpoints and 10 requests/minute for AI services.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{@{}l l l l c@{}}
+\toprule
+\textbf{Category} & \textbf{Method} & \textbf{Endpoint} & \textbf{Description} & \textbf{Auth} \\
+\midrule
+Auth & POST & \texttt{/auth/login} & Authenticate user & No \\
+ & POST & \texttt{/auth/signup} & Register new account & No \\
+ & GET & \texttt{/auth/me} & Get current user profile & Yes \\
+ \midrule
+ETFs & GET & \texttt{/etfs} & List and filter ETFs & No \\
+ & GET & \texttt{/etfs/\{ticker\}} & Get ETF metadata & No \\
+ & GET & \texttt{/etfs/\{ticker\}/prices} & Get historical prices & No \\
+ \midrule
+Portfolio & GET & \texttt{/portfolio} & List user holdings & Yes \\
+ & POST & \texttt{/portfolio} & Add/Update holding & Yes \\
+ & DELETE & \texttt{/portfolio/\{ticker\}} & Remove holding & Yes \\
+ \midrule
+Analysis & GET & \texttt{/recommendations} & Risk-based recommendations & Yes \\
+ & POST & \texttt{/scenarios/analyze} & Run stress tests & Yes \\
+ & GET & \texttt{/scenarios/var} & Calculate VaR/CVaR & Yes \\
+ & POST & \texttt{/chatbot} & AI assistant query & Yes \\
+ \midrule
+Market & GET & \texttt{/macro/indicators} & Economic indicators & No \\
+\midrule
+News & GET & \texttt{/news/ticker/\{ticker\}} & News and sentiment for ETF & No \\
+ & GET & \texttt{/news/portfolio/\{user\_id\}} & News for user's portfolio & Yes \\
+ & GET & \texttt{/news/alerts/\{user\_id\}} & News alerts for user & Yes \\
+\bottomrule
+\end{tabular}
+\caption{Summary of Core API Endpoints}
+\label{tab:api-endpoints}
+\end{table}
+
+
+\section{User Interface Design}
+
+The platform consists of six main screens, each illustrated in the figures below:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/landing_page_ui.png}
+    \caption{Landing Page UI}
+    \label{fig:landing}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/risk_questionnaire_ui.png}
+    \caption{Risk Assessment Questionnaire UI}
+    \label{fig:questionnaire}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/personalize_rec.png}
+    \caption{ETF Recommendation Result UI}
+    \label{fig:questionnaire}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/user_portfolio.png}
+    \caption{User Dashboard UI}
+    \label{fig:dashboard}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/etf_explorer_ui.png}
+    \caption{ETF Discovery UI}
+    \label{fig:etf_explorer}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/etf_details_ui.png}
+    \caption{ETF Details with AI Chatbot}
+    \label{fig:etf_details}
+\end{figure}
+

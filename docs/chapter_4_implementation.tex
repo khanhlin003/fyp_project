@@ -1,0 +1,500 @@
+\chapter{System Implementation}
+
+\section{Technology Stack Overview}
+
+The system adopts a modern full-stack architecture designed for scalability, type safety, and efficient handling of financial data. Each component in the stack was selected based on its maturity, ecosystem support, and suitability for real-time analytical workloads.
+
+\subsection{Frontend Technologies}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Technology} & \textbf{Version} & \textbf{Purpose} \\
+\midrule
+Next.js & 14.x & React framework with App Router for SSR/SSG \\
+TypeScript & 5.x & Static typing and improved maintainability \\
+Tailwind CSS & 3.x & Utility-first responsive UI styling \\
+Recharts & 2.x & Financial data visualization \\
+TanStack Query & 5.x & Server-state management and caching \\
+Axios & 1.x & HTTP client for API communication \\
+\bottomrule
+\end{tabular}
+\caption{Frontend Technology Stack}
+\label{tab:frontend_stack}
+\end{table}
+
+\subsection{Backend Technologies}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Technology} & \textbf{Version} & \textbf{Purpose} \\
+\midrule
+Python & 3.9+ & Core backend language \\
+FastAPI & 0.100+ & Asynchronous API framework \\
+SQLAlchemy & 2.x & ORM for database abstraction \\
+Pydantic & 2.x & Data validation and serialization \\
+Pandas & 2.x & Financial and time-series computation \\
+APScheduler & 3.x & Scheduled background tasks \\
+bcrypt & 4.x & Secure password hashing \\
+python-jose & 3.x & JWT token handling \\
+\bottomrule
+\end{tabular}
+\caption{Backend Technology Stack}
+\label{tab:backend_stack}
+\end{table}
+
+\subsection{Database and External Services}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Service} & \textbf{Provider} & \textbf{Purpose} \\
+\midrule
+PostgreSQL & Supabase & Relational data storage (5.7M+ records) \\
+OpenAI API & OpenAI & GPT-4o powered chatbot responses \\
+Alpha Vantage & Alpha Vantage & News sentiment analysis \\
+Yahoo Finance & yfinance & Historical OHLCV price data \\
+\bottomrule
+\end{tabular}
+\caption{Database and External Services}
+\label{tab:external_services}
+\end{table}
+
+\subsection{Deployment Infrastructure}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Component} & \textbf{Platform} & \textbf{Configuration} \\
+\midrule
+Frontend & Vercel & Edge CDN, GitHub CI/CD \\
+Backend & Render & Docker, Gunicorn + Uvicorn \\
+Database & Supabase & AWS ap-southeast-1, pooling enabled \\
+\bottomrule
+\end{tabular}
+\caption{Deployment Infrastructure}
+\label{tab:deployment_stack}
+\end{table}
+
+
+\section{Data Pipeline Implementation}
+
+The data pipeline forms the backbone of the platform and is responsible for aggregating, cleaning, validating, and storing financial data across more than 2,200 ETFs.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig/data_pipeline_flowchart.png}
+    \caption{Data Pipeline Flowchart}
+    \label{fig:data_pipeline}
+\end{figure}
+
+\subsection{Data Collection}
+
+ETF metadata, historical prices, and news sentiment are collected from multiple authoritative sources to ensure data completeness and accuracy.
+
+\textbf{ETF Metadata Collection:}
+ETF metadata is collected using automated scripts that scrape ETFdb for U.S.-listed ETFs and utilize Yahoo Finance for Singapore-listed ETFs. All fields are normalized into a unified schema, ensuring consistency across markets.
+
+\textbf{Historical Price Collection:}
+Historical daily OHLCV price data spanning up to 15 years is retrieved using the \texttt{yfinance} library. Incremental updates are performed to reduce unnecessary API calls.
+
+\begin{lstlisting}[style=pythonstyle, caption={Historical Price Update Function}]
+def update_ticker_prices(db, ticker, start_date=None, end_date=None):
+    if not start_date:
+        start_date = datetime.now() - timedelta(days=60)
+    df = yf.Ticker(ticker).history(start=start_date, end=end_date)
+    if df.empty:
+        return 0
+    for date, row in df.iterrows():
+        price = ETFPrice(
+            ticker=ticker, date=date.date(),
+            open=row['Open'], high=row['High'],
+            low=row['Low'], close=row['Close'], volume=row['Volume']
+        )
+        db.merge(price)  # Upsert to avoid duplicates
+    db.commit()
+    return len(df)
+\end{lstlisting}
+
+\textbf{News Data Collection:}
+Alpha Vantage’s \texttt{NEWS\_SENTIMENT} endpoint is queried daily with strict rate limiting. Sentiment and relevance scores are extracted and stored for downstream analysis.
+
+\subsection{Data Processing and Validation}
+
+Before storage, raw data undergoes multiple preprocessing stages:
+\begin{itemize}
+    \item {Normalization:} Conversion of percentage and currency strings to numeric formats.
+    \item {Gap Filling:} Forward-filling missing dates for continuous time series.
+    \item{Deduplication:} Enforcement of composite keys on \texttt{(ticker, date)}.
+    \item {Validation:} Sanity checks on prices, dates, and ticker formats.
+\end{itemize}
+
+\subsection{Database Population}
+
+Bulk data ingestion is optimized using PostgreSQL’s \texttt{COPY} command.
+
+\begin{lstlisting}[style=bashstyle, caption={Bulk Data Upload Script}]
+psql $DATABASE_URL -c "\COPY etf_prices FROM 'prices.csv' WITH CSV HEADER"
+\end{lstlisting}
+
+% =========================================================
+\section{Backend Implementation}
+
+The backend is implemented using FastAPI and follows a service-oriented, modular architecture.
+
+\subsection{Project Structure}
+
+\begin{lstlisting}[caption={Backend Project Structure}]
+backend/
++-- app/
+|   +-- main.py        # Application entry point and configuration
+|   +-- auth.py        # JWT authentication and user dependency
+|   +-- database.py    # Database connection using SQLAlchemy
+|   +-- models.py      # ORM models for Users, Portfolios, and ETFs
+|   +-- schemas.py     # Pydantic models for request/response validation
+|   +-- routes/        # API route definitions grouped by module
+|   +-- services/      # Business logic and complex calculations
++-- scripts/           # Data ingestion and maintenance scripts
++-- requirements.txt   # Python dependency manifest
+\end{lstlisting}
+
+\subsection{API Implementation}
+
+The backend exposes a RESTful API organized into logical modules as defined in the system design (see Chapter 3, Table~\ref{tab:api-endpoints}). The implementation uses `APIRouter` to modularize the codebase, with specific routers for authentication, ETF data, portfolio management, and analytical services.
+
+\subsection{Database Design}
+
+The database schema is optimized for financial time-series data and rapid retrieval. Key tables include \texttt{etf\_prices} which stores over 5.7 million records, partitioned and indexed for performance.
+
+\begin{lstlisting}[language=SQL, caption={Core Tables Schema}]
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    risk_profile VARCHAR(20),
+    risk_score INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE etfs (
+    ticker VARCHAR(10) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
+    expense_ratio DECIMAL(5, 4),
+    aum BIGINT,
+    market VARCHAR(10) DEFAULT 'US'
+);
+
+CREATE TABLE etf_prices (
+    ticker VARCHAR(10) REFERENCES etfs(ticker),
+    date DATE NOT NULL,
+    open DECIMAL(10, 4),
+    high DECIMAL(10, 4),
+    low DECIMAL(10, 4),
+    close DECIMAL(10, 4),
+    volume BIGINT,
+    PRIMARY KEY (ticker, date)
+);
+CREATE INDEX idx_prices_ticker_date ON etf_prices (ticker, date DESC);
+
+CREATE TABLE news_tickers (
+    news_id INTEGER REFERENCES news(id),
+    ticker VARCHAR(10) REFERENCES etfs(ticker),
+    sentiment_score FLOAT,
+    relevance_score FLOAT,
+    PRIMARY KEY (news_id, ticker)
+);
+\end{lstlisting}
+
+\subsection{Metrics Calculation}
+
+Financial metrics are calculated on-demand using vectorized Pandas operations to ensure freshness and accuracy.
+
+\textbf{Beta Calculation:}
+Beta measures systematic risk relative to the market benchmark (SPY).
+\begin{lstlisting}[style=pythonstyle, caption={Beta Calculation}]
+def calculate_beta(etf_returns: pd.Series, spy_returns: pd.Series) -> float:
+    """Using 252 trading days (1 year) of returns"""
+    covariance = etf_returns.cov(spy_returns)
+    variance = spy_returns.var()
+    return covariance / variance if variance != 0 else 1.0
+\end{lstlisting}
+
+\textbf{Sharpe Ratio:}
+Measures risk-adjusted return using the 10-year Treasury yield as the risk-free rate.
+\begin{lstlisting}[style=pythonstyle, caption={Sharpe Ratio Calculation}]
+def calculate_sharpe(returns: pd.Series, risk_free_rate: float = 0.04) -> float:
+    annualized_return = returns.mean() * 252
+    annualized_vol = returns.std() * math.sqrt(252)
+    return (annualized_return - risk_free_rate) / annualized_vol
+\end{lstlisting}
+
+\textbf{Maximum Drawdown:}
+Computes the largest peak-to-trough decline in the price history.
+\begin{lstlisting}[style=pythonstyle, caption={Maximum Drawdown Calculation}]
+def calculate_max_drawdown(prices: pd.Series) -> float:
+    running_max = prices.cummax()
+    drawdown = (prices - running_max) / running_max
+    return drawdown.min() * 100  # Return as percentage
+\end{lstlisting}
+
+\subsection{Risk Profiling}
+
+User risk tolerance is derived from a 15-question psychometric questionnaire. Each response contributes to a weighted score that maps users into one of four predefined risk profiles.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Profile} & \textbf{Score Range} & \textbf{Description} \\
+\midrule
+Conservative & 0--40 & Capital preservation focus \\
+Moderate     & 41--60 & Balanced growth and stability \\
+Growth       & 61--80 & Higher return tolerance \\
+Aggressive   & 81--100 & Maximum growth orientation \\
+\bottomrule
+\end{tabular}
+\caption{Risk Profile Classification}
+\label{tab:risk_profiles}
+\end{table}
+
+
+\subsection{Recommendation Engine}
+
+The recommendation engine employs a hybrid filtering and multi-factor scoring model. It first filters the universe of 2,272 ETFs based on the user's risk profile constraints (e.g., excluding leveraged funds for conservative investors) and then ranks the remaining candidates using a weighted scoring algorithm.
+
+\textbf{Scoring Logic:}
+Each ETF receives a score (0--100) derived from four key components:
+\begin{itemize}
+    \item \textbf{Risk Alignment (40\%):} Penalizes deviation from the target beta associated with the user's profile.
+    \item \textbf{Performance (30\%):} Normalized 3-year annualized returns compared to category peers.
+    \item \textbf{Cost Efficiency (15\%):} Inverse of the expense ratio; lower costs yield higher scores.
+    \item \textbf{Liquidity (15\%):} Based on Assets Under Management (AUM) and average volume to ensure tradeability.
+\end{itemize}
+
+\begin{lstlisting}[style=pythonstyle, caption={ETF Recommendation Scoring}]
+def calculate_recommendation_score(etf, profile):
+    # component scores are normalized 0-100
+    risk_score = calculate_risk_match(etf.beta, profile.target_beta)
+    perf_score = normalize(etf.return_3y, min_ret=-0.2, max_ret=0.3)
+    cost_score = max(0, 100 - (etf.expense_ratio * 100)) 
+    liq_score = min(100, np.log10(etf.aum) / 10 * 100)
+    
+    return (
+        risk_score * 0.40 +
+        perf_score * 0.30 +
+        cost_score * 0.15 +
+        liq_score * 0.15
+    )
+\end{lstlisting}
+
+\subsection{Scenario Analysis, VaR and CVaR}
+
+The system allows users to stress-test portfolios against historical market crashes and hypothetical shocks, providing insights into tail risks.
+
+\textbf{Historical Simulation:}
+Replays portfolio performance during significant market events, such as the COVID-19 crash (Feb 19 -- Mar 23, 2020), by filtering historical price data for specific windows.
+
+\textbf{Value at Risk (VaR) and Conditional VaR (CVaR):}
+The system calculates the 95\% Historical VaR to estimate the maximum expected loss with 95\% confidence. Additionally, it computes Conditional Value at Risk (CVaR), or Expected Shortfall, which measures the average loss assuming the VaR threshold is breached, providing a more comprehensive view of extreme downside risk.
+
+\begin{lstlisting}[style=pythonstyle, caption={VaR and CVaR Calculation}]
+def calculate_risk_metrics(returns: pd.Series, confidence: float = 0.95):
+    """Calculates Historical VaR and Expected Shortfall (CVaR)"""
+    if len(returns) < 252:
+        return 0.0, 0.0
+        
+    # VaR: The (1-confidence) percentile cutoff
+    var_threshold = np.percentile(returns, (1 - confidence) * 100)
+    
+    # CVaR: Average of all returns worse than the VaR threshold
+    cvar = returns[returns <= var_threshold].mean()
+    
+    return var_threshold, cvar
+\end{lstlisting}
+
+\subsection{AI Chatbot Service}
+
+The chatbot integrates OpenAI’s GPT-4o model. To prevent hallucinations and ensured focused answers, the system uses "Retrieval Augmented Generation" (RAG) principles by injecting the specific ETF's current metadata and financial metrics directly into the system prompt.
+
+\begin{lstlisting}[style=pythonstyle, caption={AI System Prompt Construction}]
+def construct_prompt(etf_data, user_question):
+    context = f"""
+    You are a financial assistant analyzing {etf_data['name']} ({etf_data['ticker']}).
+    Current Price: ${etf_data['price']} | Expense Ratio: {etf_data['expense_ratio']}%
+    YTD Return: {etf_data['ytd_return']}% | Beta: {etf_data['beta']}
+    Top Holdings: {', '.join(etf_data['top_holdings'])}
+    """
+    
+    return [
+        {"role": "system", "content": context + "\nProvide factual educational info. Do not give financial advice."},
+        {"role": "user", "content": user_question}
+    ]
+\end{lstlisting}
+
+\subsection{Authentication and Security}
+
+Security is enforced using JWT (JSON Web Tokens) for stateless authentication and bcrypt for password hashing. This ensures that sensitive user credentials are never stored in plain text and that API routes are protected against unauthorized access.
+
+\begin{lstlisting}[style=pythonstyle, caption={Password Hashing and Verification}]
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+\end{lstlisting}
+
+% =========================================================
+\section{Frontend Implementation}
+
+The frontend is developed using Next.js 14 with a component-driven architecture and responsive design principles.
+\begin{lstlisting}[caption={Frontend Project Structure}]
+frontend/
++-- src/
+|   +-- app/                      # Next.js App Router pages
+|   |   +-- page.tsx              # Landing page (/)
+|   |   +-- layout.tsx            # Root layout with providers
+|   |   +-- login/page.tsx
+|   |   +-- signup/page.tsx
+|   |   +-- questionnaire/page.tsx
+|   |   +-- etfs/
+|   |   |   +-- page.tsx          # List view
+|   |   |   +-- [ticker]/page.tsx # ETF Details
+|   |   +-- recommendations/page.tsx
+|   |   +-- portfolio/page.tsx
+|   +-- components/               # Reusable UI components
+|   |   +-- ETFCard.tsx
+|   |   +-- PriceChart.tsx
+|   |   +-- FilterSidebar.tsx
+|   |   +-- ScenarioAnalysis.tsx
+|   |   +-- ChatWidget.tsx
+|   +-- lib/                      # Utilities
+|       +-- api.ts                # Axios client
+|       +-- auth-context.tsx      # Authentication state
++-- package.json
++-- tailwind.config.js
+\end{lstlisting}
+
+\subsection{Frontend Routes}
+
+\begin{table}[H]
+\centering
+\label{tab:frontend_routes}
+\begin{tabular}{lll}
+\toprule
+\textbf{Page} & \textbf{Route} & \textbf{Key Features} \\
+\midrule
+Landing & / & Feature overview and call-to-action \\
+Login & /login & Authentication \\
+Questionnaire & /questionnaire & Risk assessment wizard \\
+ETF Discovery & /etfs & Search and filtering \\
+ETF Details & /etfs/[ticker] & Charts, metrics, chatbot \\
+Portfolio & /portfolio & Holdings and scenario analysis \\
+\bottomrule
+\end{tabular}
+\caption{Frontend Route Map}
+\end{table}
+
+
+\section{Implementation Challenges}
+
+Developing a data-intensive financial platform presented several significant technical challenges. This section details the key issues encountered and the solutions implemented.
+
+\subsection{API Rate Limiting and Data Freshness}
+\textbf{Challenge:} The Alpha Vantage API (free tier) restricts usage to 5 calls per minute and 500 per day. Updating news for 2,000+ ETFs daily was impossible under these constraints.
+\textbf{Solution:} We implemented a prioritization queue using \texttt{APScheduler}. The system updates the top 100 ETFs by AUM daily (requiring 100 calls spread over 20 minutes) and updates other ETFs on-demand when a user views their details page. We also utilized caching strategies to prevent redundant API calls for the same ticker within a 24-hour window.
+
+\subsection{Data Consistency and Gap Filling}
+\textbf{Challenge:} Financial data from newly listed ETFs often contains null values or non-contiguous dates, breaking chart rendering and metric calculations (e.g., volatility requires continuous returns).
+\textbf{Solution:} A robust preprocessing pipeline was built using Pandas. Missing prices on weekends/holidays are handled via forward-filling (\texttt{ffill()}), ensuring no look-ahead bias. For metrics requiring strict window sizes (e.g., 252-day volatility), ETFs with insufficient history are flagged and excluded from certain risk analytics to prevent skewed results.
+
+
+\section{Deployment Configuration}
+
+The platform is deployed using a cloud-native architecture with clearly separated frontend, backend, and database services to ensure scalability, reliability, and ease of maintenance.
+
+\begin{itemize}
+    \item {Backend:} FastAPI is containerized with Docker and deployed on Render using Gunicorn and Uvicorn workers.
+    \item {Frontend:} The Next.js application is deployed on Vercel with automatic CI/CD from GitHub.
+    \item {Database:} PostgreSQL on Supabase is configured with connection pooling, indexing, row-level security, and automated backups.
+\end{itemize}
+
+\section{Environment Configuration}
+
+Sensitive credentials and environment-specific settings are managed through environment variables, ensuring security and portability across development, staging, and production environments.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Variable} & \textbf{Purpose} & \textbf{Example} \\
+\midrule
+DATABASE\_URL & PostgreSQL connection string & postgresql://user:pass@host/db \\
+SECRET\_KEY & JWT signing key & (256-bit random string) \\
+OPENAI\_API\_KEY & GPT-4o API authentication & sk-... \\
+ALPHA\_VANTAGE\_KEY & News sentiment API key & (API key) \\
+CORS\_ORIGINS & Allowed frontend origins & https://myapp.vercel.app \\
+\bottomrule
+\end{tabular}
+\caption{Environment Variables}
+\label{tab:env_vars}
+\end{table}
+
+All secrets are stored securely in the deployment platform's environment configuration (Render for backend, Vercel for frontend) and are never committed to version control.
+
+\section{Testing and Evaluation}
+
+To ensure platform reliability and performance, a comprehensive testing strategy was implemented covering unit testing, API validation, and user acceptance testing (UAT).
+
+\subsection{API Testing}
+All 33 API endpoints were validated using 124 distinct test cases via FastAPI's TestClient and Swagger UI.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Module} & \textbf{Endpoints} & \textbf{Test Cases} & \textbf{Pass Rate} \\
+\midrule
+Authentication & 4 & 12 & 100\% \\
+ETF Data & 6 & 24 & 100\% \\
+Metrics Engine & 3 & 15 & 100\% \\
+Risk Profiling & 3 & 10 & 100\% \\
+Scenario Analysis & 3 & 10 & 100\% \\
+\textbf{Total} & \textbf{33} & \textbf{124} & \textbf{100\%} \\
+\bottomrule
+\end{tabular}
+\caption{API Test Summary}
+\label{tab:api_tests}
+\end{table}
+
+\subsection{Performance Evaluation}
+System performance was benchmarked against the non-functional requirements defined in Chapter 3.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llcc}
+\toprule
+\textbf{Operation} & \textbf{Metric} & \textbf{Target} & \textbf{Result} \\
+\midrule
+ETF List Load & Response Time & $<$ 500ms & 120ms \\
+Scenario Analysis & Calculation Time & $<$ 3000ms & 1,200ms \\
+AI Chatbot & Response Generation & $<$ 5000ms & 2,500ms \\
+Lighthouse Score & Performance & $>$ 80 & 88 \\
+\bottomrule
+\end{tabular}
+\caption{Performance Benchmarks}
+\label{tab:performance}
+\end{table}
+
+\subsection{User Acceptance Testing (UAT)}
+A UAT session with 8 retail investors yielded a 100\% task completion rate. Users rated the "Ease of Navigation" at 4.5/5 and the "Usefulness of Recommendations" at 4.3/5, validating the system's core value proposition.
+
+
+

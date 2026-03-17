@@ -1,0 +1,452 @@
+{
+  "quiz": {
+    "title": "ETF Investment Risk Profile Questionnaire",
+    "description": "A comprehensive 15-question quiz to assess your investment risk tolerance and determine your ideal ETF portfolio.",
+    "total_questions": 15,
+    "questions": [
+      {
+        "question_id": 1,
+        "question_text": "How long have you been investing in financial markets?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "I have never invested before",
+            "points": 10
+          },
+          {
+            "option_id": "B",
+            "text": "Less than 1 year",
+            "points": 20
+          },
+          {
+            "option_id": "C",
+            "text": "1-5 years",
+            "points": 40
+          },
+          {
+            "option_id": "D",
+            "text": "More than 5 years",
+            "points": 50
+          }
+        ]
+      },
+      {
+        "question_id": 2,
+        "question_text": "Which of these asset classes have you previously invested in? (Select all that apply)",
+        "question_type": "multiple_select",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Savings accounts / Bonds",
+            "points": 15
+          },
+          {
+            "option_id": "B",
+            "text": "Individual stocks",
+            "points": 30
+          },
+          {
+            "option_id": "C",
+            "text": "Mutual funds / ETFs",
+            "points": 35
+          },
+          {
+            "option_id": "D",
+            "text": "Options / Derivatives",
+            "points": 45
+          },
+          {
+            "option_id": "E",
+            "text": "Cryptocurrencies",
+            "points": 50
+          }
+        ],
+        "scoring_note": "Cap total points for this question at 50, even if multiple options are selected."
+      },
+      {
+        "question_id": 3,
+        "question_text": "When do you plan to need this money?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Within 1 year (very short-term)",
+            "points": 5
+          },
+          {
+            "option_id": "B",
+            "text": "1-3 years (short-term)",
+            "points": 20
+          },
+          {
+            "option_id": "C",
+            "text": "3-10 years (medium-term)",
+            "points": 50
+          },
+          {
+            "option_id": "D",
+            "text": "10+ years (long-term)",
+            "points": 70
+          },
+          {
+            "option_id": "E",
+            "text": "No specific timeline (indefinite)",
+            "points": 80
+          }
+        ]
+      },
+      {
+        "question_id": 4,
+        "question_text": "Your portfolio drops 20% in a single month due to market correction. What would you do?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Panic and sell everything to stop losses",
+              "points": 10
+          },
+          {
+            "option_id": "B",
+            "text": "Sell half to reduce risk",
+              "points": 50
+          },
+          {
+            "option_id": "C",
+            "text": "Do nothing and hold",
+              "points": 100
+          },
+          {
+            "option_id": "D",
+            "text": "Buy more to average down",
+              "points": 160
+          }
+        ],
+        "scoring_note": "Double points for this emotional response question."
+      },
+      {
+        "question_id": 5,
+        "question_text": "What is your annual household income?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Less than $30,000",
+            "points": 15
+          },
+          {
+            "option_id": "B",
+            "text": "$30,000 - $75,000",
+            "points": 35
+          },
+          {
+            "option_id": "C",
+            "text": "$75,000 - $150,000",
+            "points": 50
+          },
+          {
+            "option_id": "D",
+            "text": "More than $150,000",
+            "points": 70
+          }
+        ]
+      },
+      {
+        "question_id": 6,
+        "question_text": "What percentage of your savings can you comfortably afford to lose without affecting your lifestyle?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Less than 5%",
+            "points": 10
+          },
+          {
+            "option_id": "B",
+            "text": "5-10%",
+            "points": 25
+          },
+          {
+            "option_id": "C",
+            "text": "10-25%",
+            "points": 50
+          },
+          {
+            "option_id": "D",
+            "text": "More than 25%",
+            "points": 80
+          }
+        ]
+      },
+      {
+        "question_id": 7,
+        "question_text": "What is your primary investment goal?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Capital preservation (keep money safe)",
+            "points": 10
+          },
+          {
+            "option_id": "B",
+            "text": "Generate steady income (dividends)",
+            "points": 35
+          },
+          {
+            "option_id": "C",
+            "text": "Balanced growth and income",
+            "points": 50
+          },
+          {
+            "option_id": "D",
+            "text": "Maximum capital growth",
+            "points": 85
+          }
+        ]
+      },
+      {
+        "question_id": 8,
+        "question_text": "How important is regular dividend/income from your investments?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Very important (need income now)",
+            "points": 20
+          },
+          {
+            "option_id": "B",
+            "text": "Somewhat important",
+            "points": 40
+          },
+          {
+            "option_id": "C",
+            "text": "Not very important (reinvest everything)",
+            "points": 60
+          },
+          {
+            "option_id": "D",
+            "text": "Not important at all (maximize growth)",
+            "points": 80
+          }
+        ]
+      },
+      {
+        "question_id": 9,
+        "question_text": "Do you have an emergency fund with 6+ months of living expenses?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "No emergency fund",
+            "points": 15
+          },
+          {
+            "option_id": "B",
+            "text": "Yes, but less than 6 months",
+            "points": 30
+          },
+          {
+            "option_id": "C",
+            "text": "Yes, 6-12 months",
+            "points": 55
+          },
+          {
+            "option_id": "D",
+            "text": "Yes, more than 12 months",
+            "points": 75
+          }
+        ]
+      },
+      {
+        "question_id": 10,
+        "question_text": "Do you have significant debt (credit cards, loans, mortgage)?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Yes, high-interest debt (>8%)",
+            "points": 10
+          },
+          {
+            "option_id": "B",
+            "text": "Yes, moderate debt (4-8%)",
+            "points": 30
+          },
+          {
+            "option_id": "C",
+            "text": "Yes, but low-interest debt (<4%)",
+            "points": 50
+          },
+          {
+            "option_id": "D",
+            "text": "No significant debt",
+            "points": 75
+          }
+        ]
+      },
+      {
+        "question_id": 11,
+        "question_text": "How familiar are you with ETFs (Exchange Traded Funds)?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Never heard of them",
+            "points": 5
+          },
+          {
+            "option_id": "B",
+            "text": "Heard of them but don't understand",
+            "points": 20
+          },
+          {
+            "option_id": "C",
+            "text": "Understand basics",
+            "points": 50
+          },
+          {
+            "option_id": "D",
+            "text": "Very knowledgeable",
+            "points": 70
+          }
+        ]
+      },
+      {
+        "question_id": 12,
+        "question_text": "How do you feel about market volatility (price fluctuations)?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Very uncomfortable (prefer stable investments)",
+              "points": 20
+          },
+          {
+            "option_id": "B",
+            "text": "Somewhat uncomfortable",
+              "points": 70
+          },
+          {
+            "option_id": "C",
+            "text": "Comfortable with moderate volatility",
+              "points": 120
+          },
+          {
+            "option_id": "D",
+            "text": "Comfortable with high volatility (opportunity to buy low)",
+              "points": 170
+          }
+        ],
+        "scoring_note": "Double points for this emotional response question."
+      },
+      {
+        "question_id": 13,
+        "question_text": "If markets surge 30% in one year, do you feel pressure to invest more?",
+        "question_type": "multiple_choice",
+        "options": [
+            {
+              "option_id": "A",
+              "text": "Yes, FOMO makes me want to jump in",
+              "points": 80
+            },
+            {
+              "option_id": "B",
+              "text": "Somewhat, but I try to stick to my plan",
+              "points": 45
+            },
+            {
+              "option_id": "C",
+              "text": "No, I follow my investment plan",
+              "points": 20
+            },
+            {
+              "option_id": "D",
+              "text": "No, I might even sell some gains",
+              "points": 10
+            }
+        ]
+      },
+      {
+        "question_id": 14,
+        "question_text": "If your investment underperforms the market for 2 years, would you sell?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Yes, likely (cut losses or chase better performers)",
+              "points": 40
+          },
+          {
+            "option_id": "B",
+            "text": "Maybe, depends on the reason",
+              "points": 90
+          },
+          {
+            "option_id": "C",
+            "text": "No, I believe in long-term investing",
+              "points": 140
+          },
+          {
+            "option_id": "D",
+            "text": "No, I'd use it as a buying opportunity",
+              "points": 170
+          }
+        ],
+        "scoring_note": "Double points for this emotional response question."
+      },
+      {
+        "question_id": 15,
+        "question_text": "Do you prefer diversified (many sectors) or concentrated (few sectors) portfolios?",
+        "question_type": "multiple_choice",
+        "options": [
+          {
+            "option_id": "A",
+            "text": "Highly diversified (lower risk, lower returns)",
+            "points": 20
+          },
+          {
+            "option_id": "B",
+            "text": "Well-diversified across sectors",
+            "points": 50
+          },
+          {
+            "option_id": "C",
+            "text": "Somewhat concentrated (higher risk, higher potential returns)",
+            "points": 70
+          },
+          {
+            "option_id": "D",
+            "text": "Highly concentrated (highest risk/reward)",
+            "points": 85
+          }
+        ]
+      }
+    ],
+    "scoring": {
+      "min_score": 0,
+      "max_score": 1275,
+      "risk_profiles": [
+        {
+          "profile_name": "Conservative",
+          "min_score": 0,
+          "max_score": 425,
+          "description": "Low-risk investor prioritizing capital preservation and stable income"
+        },
+        {
+          "profile_name": "Balanced",
+          "min_score": 426,
+          "max_score": 850,
+          "description": "Moderate-risk investor balancing growth with stability"
+        },
+        {
+          "profile_name": "Aggressive",
+          "min_score": 851,
+          "max_score": 1275,
+          "description": "High-risk investor prioritizing capital growth over stability"
+        }
+      ]
+    }
+  }
+}

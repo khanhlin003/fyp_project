@@ -1,0 +1,33 @@
+# Dependencies
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Large data files
+data/processed/combined_etf_prices_15y.csv
+data/processed/supabase_upload/
+*.csv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+.next/
+node_modules/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test
+coverage/
+.pytest_cache/
