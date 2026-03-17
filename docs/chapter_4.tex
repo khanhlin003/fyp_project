@@ -14,8 +14,8 @@ The system adopts a modern full-stack architecture designed for scalability, typ
 \midrule
 Next.js & 14.x & React framework with App Router for SSR/SSG \\
 TypeScript & 5.x & Static typing and improved maintainability \\
-Tailwind CSS & 3.x & Utility-first responsive UI styling \\
-Recharts & 2.x & Financial data visualization \\
+Tailwind CSS & 4.x & Utility-first responsive UI styling \\
+Recharts & 3.x & Financial data visualization \\
 TanStack Query & 5.x & Server-state management and caching \\
 Axios & 1.x & HTTP client for API communication \\
 \bottomrule
@@ -32,8 +32,8 @@ Axios & 1.x & HTTP client for API communication \\
 \toprule
 \textbf{Technology} & \textbf{Version} & \textbf{Purpose} \\
 \midrule
-Python & 3.9+ & Core backend language \\
-FastAPI & 0.100+ & Asynchronous API framework \\
+Python & 3.11+ & Core backend language \\
+FastAPI & 0.104+ & Asynchronous API framework \\
 SQLAlchemy & 2.x & ORM for database abstraction \\
 Pydantic & 2.x & Data validation and serialization \\
 Pandas & 2.x & Financial and time-series computation \\
@@ -55,8 +55,9 @@ python-jose & 3.x & JWT token handling \\
 \textbf{Service} & \textbf{Provider} & \textbf{Purpose} \\
 \midrule
 PostgreSQL & Supabase & Relational data storage (5.7M+ records) \\
-OpenAI API & OpenAI & GPT-4o powered chatbot responses \\
+OpenAI API & OpenAI & LLM-powered educational chatbot responses \\
 Alpha Vantage & Alpha Vantage & News sentiment analysis \\
+FRED & Federal Reserve Economic Data & Macroeconomic indicators \\
 Yahoo Finance & yfinance & Historical OHLCV price data \\
 \bottomrule
 \end{tabular}
@@ -220,52 +221,68 @@ def calculate_max_drawdown(prices: pd.Series) -> float:
 
 \subsection{Risk Profiling}
 
-User risk tolerance is derived from a 15-question psychometric questionnaire. Each response contributes to a weighted score that maps users into one of four predefined risk profiles.
+User risk tolerance is derived from a questionnaire-driven scoring workflow implemented through backend quiz endpoints and frontend questionnaire pages. In the current version, users are mapped to three operational profiles used consistently across recommendation and portfolio workflows: \textbf{conservative}, \textbf{balanced}, and \textbf{aggressive}. Profile mapping thresholds are configuration-driven in the quiz service layer so they can be adjusted without changing API contracts.
 
 \begin{table}[H]
 \centering
-\begin{tabular}{lll}
+\begin{tabular}{ll}
 \toprule
-\textbf{Profile} & \textbf{Score Range} & \textbf{Description} \\
+\textbf{Profile} & \textbf{Practical Interpretation} \\
 \midrule
-Conservative & 0--40 & Capital preservation focus \\
-Moderate     & 41--60 & Balanced growth and stability \\
-Growth       & 61--80 & Higher return tolerance \\
-Aggressive   & 81--100 & Maximum growth orientation \\
+Conservative & Capital preservation and lower volatility preference \\
+Balanced & Mixed growth and stability preference \\
+Aggressive & Higher return target with higher risk tolerance \\
 \bottomrule
 \end{tabular}
-\caption{Risk Profile Classification}
+\caption{Implemented Risk Profile Categories}
 \label{tab:risk_profiles}
 \end{table}
 
 
 \subsection{Recommendation Engine}
 
-The recommendation engine employs a hybrid filtering and multi-factor scoring model. It first filters the universe of 2,272 ETFs based on the user's risk profile constraints (e.g., excluding leveraged funds for conservative investors) and then ranks the remaining candidates using a weighted scoring algorithm.
+The current recommendation engine is implemented as a \textbf{rule-based multi-factor scorer} with profile-aware filtering. It first applies hard constraints from the selected profile (for example beta boundaries and excluded categories), then computes a bounded score with transparent additive bonuses and penalties.
 
-\textbf{Scoring Logic:}
-Each ETF receives a score (0--100) derived from four key components:
+\textbf{Implemented scoring signals include:}
 \begin{itemize}
-    \item \textbf{Risk Alignment (40\%):} Penalizes deviation from the target beta associated with the user's profile.
-    \item \textbf{Performance (30\%):} Normalized 3-year annualized returns compared to category peers.
-    \item \textbf{Cost Efficiency (15\%):} Inverse of the expense ratio; lower costs yield higher scores.
-    \item \textbf{Liquidity (15\%):} Based on Assets Under Management (AUM) and average volume to ensure tradeability.
+    \item beta alignment with profile expectations,
+    \item return and dividend heuristics (profile-dependent weighting),
+    \item low expense ratio bonuses,
+    \item category and asset-class matching,
+    \item risk-category penalties (for disallowed profile classes).
 \end{itemize}
 
-\begin{lstlisting}[style=pythonstyle, caption={ETF Recommendation Scoring}]
+\begin{lstlisting}[style=pythonstyle, caption={Rule-Based Recommendation Scoring (Simplified)}]
 def calculate_recommendation_score(etf, profile):
-    # component scores are normalized 0-100
-    risk_score = calculate_risk_match(etf.beta, profile.target_beta)
-    perf_score = normalize(etf.return_3y, min_ret=-0.2, max_ret=0.3)
-    cost_score = max(0, 100 - (etf.expense_ratio * 100)) 
-    liq_score = min(100, np.log10(etf.aum) / 10 * 100)
-    
-    return (
-        risk_score * 0.40 +
-        perf_score * 0.30 +
-        cost_score * 0.15 +
-        liq_score * 0.15
-    )
+    score = 50  # baseline
+
+    beta = parse_beta(etf.beta)
+    ytd_return = parse_percentage(etf.return_ytd)
+    dividend = parse_percentage(etf.annual_dividend_yield)
+    fee = parse_percentage(etf.expense_ratio)
+
+    # Profile-aware risk/return adjustments
+    if profile == "conservative":
+        if beta is not None and beta < 0.8:
+            score += 15
+        if dividend is not None and dividend > 3:
+            score += 15
+    elif profile == "balanced":
+        if beta is not None and 0.9 <= beta <= 1.1:
+            score += 15
+    elif profile == "aggressive":
+        if beta is not None and beta > 1.3:
+            score += 20
+        if ytd_return is not None and ytd_return > 20:
+            score += 20
+
+    # Cost bonus and category penalties
+    if fee is not None and fee < 0.2:
+        score += 10
+    if is_disallowed_category(etf.category, profile):
+        score -= 30
+
+    return min(100, max(0, score))
 \end{lstlisting}
 
 \subsection{Scenario Analysis and VaR}
@@ -288,7 +305,7 @@ def calculate_historical_var(returns: pd.Series, confidence: float = 0.95) -> fl
 
 \subsection{AI Chatbot Service}
 
-The chatbot integrates OpenAI’s GPT-4o model. To prevent hallucinations and ensured focused answers, the system uses "Retrieval Augmented Generation" (RAG) principles by injecting the specific ETF's current metadata and financial metrics directly into the system prompt.
+The chatbot integrates OpenAI LLM APIs for educational Q\&A. To reduce hallucinations and keep responses focused, the service follows retrieval-style grounding by injecting current ETF metadata and computed metrics into the prompt context before model invocation.
 
 \begin{lstlisting}[style=pythonstyle, caption={AI System Prompt Construction}]
 def construct_prompt(etf_data, user_question):
@@ -324,30 +341,34 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 The frontend is developed using Next.js 14 with a component-driven architecture and responsive design principles.
 \begin{lstlisting}[caption={Frontend Project Structure}]
-frontend/src/
+frontend/
 +-- src/
-|   +-- app/                      # Next.js App Router pages
-|   |   +-- page.tsx              # Landing page (/)
-|   |   +-- layout.tsx            # Root layout with providers
+|   +-- app/                          # Next.js App Router pages
+|   |   +-- page.tsx                  # Landing page (/)
+|   |   +-- layout.tsx                # Root layout with providers
 |   |   +-- login/page.tsx
 |   |   +-- signup/page.tsx
 |   |   +-- questionnaire/page.tsx
-|   |   +-- etfs/
-|   |   |   +-- page.tsx          # List view
-|   |   |   +-- [ticker]/page.tsx # ETF Details
 |   |   +-- recommendations/page.tsx
+|   |   +-- etfs/
+|   |   |   +-- page.tsx              # ETF discovery
+|   |   |   +-- [ticker]/page.tsx     # ETF details
 |   |   +-- portfolio/page.tsx
-|   +-- components/               # Reusable UI components
-|   |   +-- ETFCard.tsx
-|   |   +-- PriceChart.tsx
-|   |   +-- FilterSidebar.tsx
+|   |   +-- wallets/page.tsx
+|   |   +-- scenarios/page.tsx
+|   |   +-- profile/page.tsx
+|   +-- components/                   # Reusable UI components
+|   |   +-- AppShell.tsx
+|   |   +-- Header.tsx
+|   |   +-- NewsFeed.tsx
 |   |   +-- ScenarioAnalysis.tsx
-|   |   +-- ChatWidget.tsx
-|   +-- lib/                      # Utilities
-|       +-- api.ts                # Axios client
-|       +-- auth-context.tsx      # Authentication state
+|   |   +-- VarAnalysis.tsx
+|   +-- contexts/
+|   |   +-- AuthContext.tsx
+|   +-- lib/
+|       +-- api.ts                    # Axios API client
+|       +-- providers.tsx             # Query/Auth providers
 +-- package.json
-+-- tailwind.config.js
 \end{lstlisting}
 
 \subsection{Frontend Routes}
@@ -362,9 +383,13 @@ frontend/src/
 Landing & / & Feature overview and call-to-action \\
 Login & /login & Authentication \\
 Questionnaire & /questionnaire & Risk assessment wizard \\
+Recommendations & /recommendations & Profile-aligned ETF ranking and rationale \\
 ETF Discovery & /etfs & Search and filtering \\
 ETF Details & /etfs/[ticker] & Charts, metrics, chatbot \\
-Portfolio & /portfolio & Holdings and scenario analysis \\
+Portfolio & /portfolio & Holdings, valuation, and news \\
+Wallets & /wallets & Goal-based wallet management \\
+Scenario Analysis & /scenarios & Stress testing and VaR/CVaR \\
+Profile Settings & /profile & User profile and risk preference updates \\
 \bottomrule
 \end{tabular}
 \caption{Frontend Route Map}
@@ -398,47 +423,7 @@ The platform is deployed using a cloud-native architecture with clearly separate
 
 \section{Testing and Evaluation}
 
-To ensure platform reliability and performance, a comprehensive testing strategy was implemented covering unit testing, API validation, and user acceptance testing (UAT).
-
-\subsection{API Testing}
-All 33 API endpoints were validated using 124 distinct test cases via FastAPI's TestClient and Swagger UI.
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Module} & \textbf{Endpoints} & \textbf{Test Cases} & \textbf{Pass Rate} \\
-\midrule
-Authentication & 4 & 12 & 100\% \\
-ETF Data & 6 & 24 & 100\% \\
-Metrics Engine & 3 & 15 & 100\% \\
-Risk Profiling & 3 & 10 & 100\% \\
-Scenario Analysis & 3 & 10 & 100\% \\
-\textbf{Total} & \textbf{33} & \textbf{124} & \textbf{100\%} \\
-\bottomrule
-\end{tabular}
-\caption{API Test Summary}
-\label{tab:api_tests}
-\end{table}
-
-\subsection{Performance Evaluation}
-System performance was benchmarked against the non-functional requirements defined in Chapter 3.
-
-\begin{table}[H]
-\centering
-\begin{tabular}{llcc}
-\toprule
-\textbf{Operation} & \textbf{Metric} & \textbf{Target} & \textbf{Result} \\
-\midrule
-ETF List Load & Response Time & $<$ 500ms & 120ms \\
-Scenario Analysis & Calculation Time & $<$ 3000ms & 1,200ms \\
-AI Chatbot & Response Generation & $<$ 5000ms & 2,500ms \\
-Lighthouse Score & Performance & $>$ 80 & 88 \\
-\bottomrule
-\end{tabular}
-\caption{Performance Benchmarks}
-\label{tab:performance}
-\end{table}
+Testing and evaluation procedures are documented in detail in Chapter 5 to keep this chapter implementation-focused. During implementation, API contracts were validated iteratively through FastAPI interactive documentation, route-level checks, and frontend integration tests for authentication, portfolio workflows, recommendation retrieval, and scenario analysis outputs.
 
 
 
