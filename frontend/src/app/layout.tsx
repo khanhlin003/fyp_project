@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
-import Header from "@/components/Header";
+import AppShell from "@/components/AppShell";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -32,8 +32,7 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <Providers>
-          <Header />
-          <div className="pt-14 sm:pt-14">{children}</div>
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

@@ -2,13 +2,16 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import axios from 'axios';
-import { getPortfolioNews, NewsArticle, getAvailableScenarios, ScenarioOption, getPortfolioVar, VarResult, refreshPortfolioNews } from '@/lib/api';
+import {
+  getPortfolioNews,
+  NewsArticle,
+  refreshPortfolioNews,
+  getWallets,
+  InvestmentWallet,
+} from '@/lib/api';
 import NewsFeed from '@/components/NewsFeed';
-import ScenarioAnalysis from '@/components/ScenarioAnalysis';
-import VarAnalysis from '@/components/VarAnalysis';
 import { 
   TrendingUp, TrendingDown, Trash2, Plus, Search, Loader2, 
   AlertCircle, PieChart, Wallet, ArrowUpRight, ArrowDownRight,
@@ -21,9 +24,11 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 interface PortfolioHolding {
   id: number;
   ticker: string;
+  wallet_id?: number | null;
   quantity: number;
   purchase_price: number;
   purchase_date: string;
+  wallet_name?: string | null;
   etf_name: string | null;
   category: string | null;
   current_price: number | null;
@@ -71,11 +76,11 @@ const PORTFOLIO_INFO = {
   marketValueCol: 'Current value of this holding: quantity multiplied by latest price.',
   unrealizedPLCol: 'Unrealized return for this holding based on current value versus cost basis.',
   weight: 'This holding as a percentage of total portfolio market value.',
+  wallet: 'The wallet this holding belongs to. Consolidated rows may show Main Portfolio.',
 };
 
 export default function PortfolioPage() {
-  const router = useRouter();
-  const { user, token, isAuthenticated, isLoading: authLoading, logout } = useAuth();
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth();
   
   const [portfolio, setPortfolio] = useState<PortfolioResponse | null>(null);
   const [portfolioTimeseries, setPortfolioTimeseries] = useState<PortfolioTimeseriesPoint[]>([]);
@@ -89,17 +94,41 @@ export default function PortfolioPage() {
   const [newQuantity, setNewQuantity] = useState<string>('');
   const [newPrice, setNewPrice] = useState<string>('');
   const [newPurchaseDate, setNewPurchaseDate] = useState<string>('');
+  const [newWalletId, setNewWalletId] = useState<string>('');
   const [addLoading, setAddLoading] = useState(false);
   const [editingTicker, setEditingTicker] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState<string>('');
   const [editPrice, setEditPrice] = useState<string>('');
   const [news, setNews] = useState<NewsArticle[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
-  const [scenarios, setScenarios] = useState<ScenarioOption[]>([]);
-  const [activeInsightTab, setActiveInsightTab] = useState<'scenario' | 'var' | 'news'>('scenario');
   const [showVisualsSection, setShowVisualsSection] = useState(true);
   const [showHoldingsSection, setShowHoldingsSection] = useState(true);
   const [showInsightsSection, setShowInsightsSection] = useState(false);
+  const [wallets, setWallets] = useState<InvestmentWallet[]>([]);
+  const [selectedWalletView, setSelectedWalletView] = useState<'all' | string>('all');
+  const [localWalletMap, setLocalWalletMap] = useState<Record<string, { wallet_id: number; wallet_name: string }>>({});
+
+  const persistLocalWalletMap = (next: Record<string, { wallet_id: number; wallet_name: string }>) => {
+    setLocalWalletMap(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('walletAssignments', JSON.stringify(next));
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem('walletAssignments');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          setLocalWalletMap(parsed);
+        }
+      }
+    } catch {
+      // Ignore corrupted local cache.
+    }
+  }, []);
 
   // Fetch portfolio data from backend
   const fetchPortfolio = async () => {
@@ -128,6 +157,15 @@ export default function PortfolioPage() {
       setError('Failed to load portfolio. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWalletData = async () => {
+    try {
+      const data = await getWallets({ include_profile: false });
+      setWallets(data);
+    } catch (err) {
+      console.error('Failed to fetch wallets:', err);
     }
   };
 
@@ -170,22 +208,12 @@ export default function PortfolioPage() {
     }
   };
 
-  // Fetch available scenarios
-  const fetchScenarios = async () => {
-    try {
-      const data = await getAvailableScenarios();
-      setScenarios(data);
-    } catch (error) {
-      console.error('Failed to fetch scenarios:', error);
-    }
-  };
-
   // Fetch portfolio when authenticated
   useEffect(() => {
     if (isAuthenticated && token) {
       fetchPortfolio();
       fetchNews();
-      fetchScenarios();
+      fetchWalletData();
     } else if (!authLoading) {
       setLoading(false);
     }
@@ -236,9 +264,31 @@ export default function PortfolioPage() {
           quantity,
           purchase_price: price,
           purchase_date: newPurchaseDate || undefined,
+          wallet_id: newWalletId ? Number(newWalletId) : undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      if (newWalletId) {
+        await axios.put(
+          `${API_BASE_URL}/portfolio/${searchResult.ticker}`,
+          {
+            quantity,
+            purchase_price: price,
+            purchase_date: newPurchaseDate || undefined,
+            wallet_id: Number(newWalletId),
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const selectedWallet = wallets.find((w) => String(w.id) === String(newWalletId));
+        if (selectedWallet) {
+          persistLocalWalletMap({
+            ...localWalletMap,
+            [searchResult.ticker]: { wallet_id: selectedWallet.id, wallet_name: selectedWallet.name },
+          });
+        }
+      }
       
       // Refresh portfolio
       await fetchPortfolio();
@@ -250,9 +300,59 @@ export default function PortfolioPage() {
       setNewQuantity('');
       setNewPrice('');
       setNewPurchaseDate('');
+      setNewWalletId('');
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setSearchError(err.response.data.detail);
+        const detail = String(err.response.data.detail);
+        const alreadyInPortfolio = detail.toLowerCase().includes('already in portfolio');
+
+        if (alreadyInPortfolio) {
+          try {
+            const existing = portfolio?.holdings.find((h) => h.ticker === searchResult.ticker);
+            const mergedQuantity = (existing?.quantity || 0) + quantity;
+
+            await axios.put(
+              `${API_BASE_URL}/portfolio/${searchResult.ticker}`,
+              {
+                quantity: mergedQuantity,
+                purchase_price: price || existing?.purchase_price || undefined,
+                purchase_date: newPurchaseDate || existing?.purchase_date || undefined,
+                wallet_id: newWalletId ? Number(newWalletId) : undefined,
+              },
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (newWalletId) {
+              const selectedWallet = wallets.find((w) => String(w.id) === String(newWalletId));
+              if (selectedWallet) {
+                persistLocalWalletMap({
+                  ...localWalletMap,
+                  [searchResult.ticker]: { wallet_id: selectedWallet.id, wallet_name: selectedWallet.name },
+                });
+              }
+            }
+
+            await fetchPortfolio();
+            setShowAddModal(false);
+            setSearchTicker('');
+            setSearchResult(null);
+            setNewQuantity('');
+            setNewPrice('');
+            setNewPurchaseDate('');
+            setNewWalletId('');
+            setSearchError(null);
+            return;
+          } catch (updateErr: unknown) {
+            if (axios.isAxiosError(updateErr) && updateErr.response?.data?.detail) {
+              setSearchError(String(updateErr.response.data.detail));
+            } else {
+              setSearchError('Failed to update existing ETF in selected wallet.');
+            }
+            return;
+          }
+        }
+
+        setSearchError(detail);
       } else {
         setSearchError('Failed to add ETF. Please try again.');
       }
@@ -298,11 +398,48 @@ export default function PortfolioPage() {
   };
 
   // Prepare pie chart data
-  const pieData = portfolio?.holdings.map((item, index) => ({
+  const filteredHoldings = useMemo(() => {
+    if (!portfolio) return [];
+    if (selectedWalletView === 'all') return portfolio.holdings;
+    const walletId = Number(selectedWalletView);
+    return portfolio.holdings.filter((h) => {
+      const resolvedWalletId = h.wallet_id ?? localWalletMap[h.ticker]?.wallet_id ?? null;
+      return resolvedWalletId === walletId;
+    });
+  }, [portfolio, selectedWalletView, localWalletMap]);
+
+  const scopedTotals = useMemo(() => {
+    const totalCost = filteredHoldings.reduce(
+      (sum, item) => sum + ((item.purchase_price || 0) * item.quantity),
+      0
+    );
+    const totalValue = filteredHoldings.reduce(
+      (sum, item) => sum + (item.current_value ?? ((item.current_price ?? item.purchase_price ?? 0) * item.quantity)),
+      0
+    );
+    const totalGainLoss = totalValue - totalCost;
+    const totalGainLossPercent = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
+
+    return {
+      totalCost,
+      totalValue,
+      totalGainLoss,
+      totalGainLossPercent,
+      holdingsCount: filteredHoldings.length,
+    };
+  }, [filteredHoldings]);
+
+  const selectedWalletName = useMemo(() => {
+    if (selectedWalletView === 'all') return 'All Wallets';
+    const wallet = wallets.find((w) => String(w.id) === String(selectedWalletView));
+    return wallet?.name || 'Selected Wallet';
+  }, [selectedWalletView, wallets]);
+
+  const pieData = filteredHoldings.map((item, index) => ({
     name: item.ticker,
     value: item.current_value || item.quantity * item.purchase_price,
     color: COLORS[index % COLORS.length]
-  })).filter(d => d.value > 0) || [];
+  })).filter(d => d.value > 0);
 
   const growthData = portfolioTimeseries.map((p) => ({
     date: p.date,
@@ -365,23 +502,7 @@ export default function PortfolioPage() {
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const hasPortfolioHoldings = !!portfolio && portfolio.holdings.length > 0;
-  const canShowScenario = isAuthenticated && hasPortfolioHoldings && scenarios.length > 0;
-  const canShowVar = isAuthenticated && !!user;
   const canShowNews = isAuthenticated && !!user;
-
-  const availableInsightTabs = [
-    canShowScenario ? 'scenario' : null,
-    canShowVar ? 'var' : null,
-    canShowNews ? 'news' : null,
-  ].filter((tab): tab is 'scenario' | 'var' | 'news' => tab !== null);
-
-  useEffect(() => {
-    if (availableInsightTabs.length === 0) return;
-    if (!availableInsightTabs.includes(activeInsightTab)) {
-      setActiveInsightTab(availableInsightTabs[0]);
-    }
-  }, [activeInsightTab, availableInsightTabs]);
 
   // Show login prompt if not authenticated
   if (!authLoading && !isAuthenticated) {
@@ -428,6 +549,16 @@ export default function PortfolioPage() {
             <p className="text-[#3a5260] mt-1">Track your ETF holdings and performance</p>
           </div>
           <div className="flex gap-3">
+            <select
+              value={selectedWalletView}
+              onChange={(e) => setSelectedWalletView(e.target.value as 'all' | string)}
+              className="px-3 py-2 border border-[#cae7ee] rounded-lg text-sm text-[#3a5260] bg-white"
+            >
+              <option value="all">All Wallets</option>
+              {wallets.map((wallet) => (
+                <option key={wallet.id} value={String(wallet.id)}>{wallet.name}</option>
+              ))}
+            </select>
             <button
               onClick={fetchPortfolio}
               className="flex items-center gap-2 px-4 py-2 border border-[#cae7ee] rounded-lg text-[#3a5260] hover:bg-[#f0f8fa] transition-colors"
@@ -476,7 +607,7 @@ export default function PortfolioPage() {
         {!loading && portfolio && portfolio.holdings.length > 0 && (
           <>
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
               <div className="bg-white rounded-xl border border-[#cae7ee] p-4">
                 <div className="flex items-center gap-2.5 mb-2">
                   <div className="w-8 h-8 bg-[rgba(85,178,201,0.12)] rounded-lg flex items-center justify-center">
@@ -488,7 +619,7 @@ export default function PortfolioPage() {
                   </span>
                 </div>
                 <p className="text-xl font-bold text-[#0d1117]">
-                  ${portfolio.total_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${scopedTotals.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
               
@@ -503,14 +634,14 @@ export default function PortfolioPage() {
                   </span>
                 </div>
                 <p className="text-xl font-bold text-[#0d1117]">
-                  ${portfolio.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${scopedTotals.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
               
               <div className="bg-white rounded-xl border border-[#cae7ee] p-4">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${portfolio.total_gain_loss >= 0 ? 'bg-[#1cb08a12]' : 'bg-[#d44a4a12]'}`}>
-                    {portfolio.total_gain_loss >= 0 ? (
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${scopedTotals.totalGainLoss >= 0 ? 'bg-[#1cb08a12]' : 'bg-[#d44a4a12]'}`}>
+                    {scopedTotals.totalGainLoss >= 0 ? (
                       <ArrowUpRight className="w-4 h-4 text-[#1cb08a]" />
                     ) : (
                       <ArrowDownRight className="w-4 h-4 text-[#d44a4a]" />
@@ -521,26 +652,48 @@ export default function PortfolioPage() {
                     <InfoTooltip text={PORTFOLIO_INFO.unrealizedPL} />
                   </span>
                 </div>
-                <p className={`text-xl font-bold ${portfolio.total_gain_loss >= 0 ? 'text-[#1cb08a]' : 'text-[#d44a4a]'}`}>
-                  {portfolio.total_gain_loss >= 0 ? '+' : ''}${portfolio.total_gain_loss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <p className={`text-xl font-bold ${scopedTotals.totalGainLoss >= 0 ? 'text-[#1cb08a]' : 'text-[#d44a4a]'}`}>
+                  {scopedTotals.totalGainLoss >= 0 ? '+' : ''}${scopedTotals.totalGainLoss.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
               
               <div className="bg-white rounded-xl border border-[#cae7ee] p-4">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${portfolio.total_gain_loss_percent >= 0 ? 'bg-[#1cb08a12]' : 'bg-[#d44a4a12]'}`}>
-                    <BarChart3 className={`w-4 h-4 ${portfolio.total_gain_loss_percent >= 0 ? 'text-[#1cb08a]' : 'text-[#d44a4a]'}`} />
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${scopedTotals.totalGainLossPercent >= 0 ? 'bg-[#1cb08a12]' : 'bg-[#d44a4a12]'}`}>
+                    <BarChart3 className={`w-4 h-4 ${scopedTotals.totalGainLossPercent >= 0 ? 'text-[#1cb08a]' : 'text-[#d44a4a]'}`} />
                   </div>
                   <span className="text-[#3a5260] text-xs inline-flex items-center gap-1">
                     Unrealized Return
                     <InfoTooltip text={PORTFOLIO_INFO.unrealizedReturn} />
                   </span>
                 </div>
-                <p className={`text-xl font-bold ${portfolio.total_gain_loss_percent >= 0 ? 'text-[#1cb08a]' : 'text-[#d44a4a]'}`}>
-                  {portfolio.total_gain_loss_percent >= 0 ? '+' : ''}{portfolio.total_gain_loss_percent.toFixed(2)}%
+                <p className={`text-xl font-bold ${scopedTotals.totalGainLossPercent >= 0 ? 'text-[#1cb08a]' : 'text-[#d44a4a]'}`}>
+                  {scopedTotals.totalGainLossPercent >= 0 ? '+' : ''}{scopedTotals.totalGainLossPercent.toFixed(2)}%
                 </p>
               </div>
+
+              <div className="bg-white rounded-xl border border-[#cae7ee] p-4">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="w-8 h-8 bg-[#f0f8fa] rounded-lg flex items-center justify-center">
+                    <Wallet className="w-4 h-4 text-[#3a5260]" />
+                  </div>
+                  <span className="text-[#3a5260] text-xs inline-flex items-center gap-1">
+                    Scope
+                    <InfoTooltip text="Current portfolio view scope." />
+                  </span>
+                </div>
+                <p className="text-xl font-bold text-[#0d1117]">{selectedWalletName}</p>
+                <Link href="/wallets" className="inline-flex items-center gap-1 text-xs text-[#3d96ad] hover:text-[#2f7990] mt-1">
+                  View details
+                </Link>
+              </div>
             </div>
+
+            {selectedWalletView !== 'all' && (
+              <div className="mb-4 rounded-lg border border-[#cae7ee] bg-[#f8fafc] px-3 py-2 text-sm text-[#3a5260]">
+                Portfolio growth chart remains an overall view. Summary, allocation, and holdings below are filtered to {selectedWalletName}.
+              </div>
+            )}
 
             {/* Growth and Allocation */}
             <div className="mb-4 flex items-center justify-between">
@@ -646,7 +799,7 @@ export default function PortfolioPage() {
                         <span className="text-[#3a5260]">{item.name}</span>
                       </div>
                       <span className="text-[#0d1117] font-medium">
-                        {((item.value / portfolio.total_value) * 100).toFixed(1)}%
+                        {(scopedTotals.totalValue > 0 ? ((item.value / scopedTotals.totalValue) * 100) : 0).toFixed(1)}%
                       </span>
                     </div>
                   ))}
@@ -672,7 +825,7 @@ export default function PortfolioPage() {
                 <div className="p-6 border-b border-[#cae7ee] flex items-center justify-between gap-4">
                   <h2 className="text-lg font-semibold text-[#0d1117] flex items-center gap-2">
                     <Wallet className="w-5 h-5 text-[#55b2c9]" />
-                    Holdings ({portfolio.holdings_count})
+                    Holdings ({scopedTotals.holdingsCount})
                   </h2>
                   <button
                     onClick={() => setShowAddModal(true)}
@@ -683,11 +836,14 @@ export default function PortfolioPage() {
                   </button>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px] text-sm">
+                  <table className="w-full min-w-[980px] text-sm">
                     <thead className="bg-[#f8fafc] text-[#64748b]">
                       <tr>
                         <th className="text-left font-medium px-4 py-3">Ticker</th>
                         <th className="text-left font-medium px-4 py-3">Name</th>
+                        <th className="text-left font-medium px-4 py-3">
+                          <span className="inline-flex items-center gap-1">Wallet <InfoTooltip text={PORTFOLIO_INFO.wallet} /></span>
+                        </th>
                         <th className="text-right font-medium px-4 py-3">
                           <span className="inline-flex items-center gap-1">Quantity <InfoTooltip text={PORTFOLIO_INFO.quantity} /></span>
                         </th>
@@ -713,7 +869,7 @@ export default function PortfolioPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {portfolio.holdings.map((holding) => (
+                      {filteredHoldings.map((holding) => (
                         <tr key={holding.ticker} className="border-t border-[#cae7ee] hover:bg-[#f8fafc]">
                           <td className="px-4 py-3">
                             <Link href={`/etfs/${holding.ticker}`} className="font-semibold text-[#0d1117] hover:text-[#3d96ad] transition-colors">
@@ -722,6 +878,11 @@ export default function PortfolioPage() {
                           </td>
                           <td className="px-4 py-3 text-[#64748b] max-w-[220px] truncate">
                             {holding.etf_name || holding.category || 'ETF'}
+                          </td>
+                          <td className="px-4 py-3 text-left text-[#3a5260]">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-[#f0f8fa] text-[#3a5260]">
+                              {holding.wallet_name || localWalletMap[holding.ticker]?.wallet_name || 'Main Portfolio'}
+                            </span>
                           </td>
                           <td className="px-4 py-3 text-right text-[#0d1117]">
                             {editingTicker === holding.ticker ? (
@@ -766,7 +927,7 @@ export default function PortfolioPage() {
                             {(holding.gain_loss_percent ?? 0) >= 0 ? '+' : ''}{(holding.gain_loss_percent ?? 0).toFixed(2)}%
                           </td>
                           <td className="px-4 py-3 text-right text-[#0d1117]">
-                            {portfolio.total_value > 0 ? (((holding.current_value || 0) / portfolio.total_value) * 100).toFixed(1) : '0.0'}%
+                            {scopedTotals.totalValue > 0 ? (((holding.current_value || 0) / scopedTotals.totalValue) * 100).toFixed(1) : '0.0'}%
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex justify-end gap-1">
@@ -812,16 +973,22 @@ export default function PortfolioPage() {
                     </tbody>
                   </table>
                 </div>
+
+                {filteredHoldings.length === 0 && (
+                  <div className="px-6 py-8 text-sm text-[#7a9fad] border-t border-[#cae7ee]">
+                    No holdings found for {selectedWalletName}.
+                  </div>
+                )}
             </div>
             )}
           </>
         )}
 
-        {/* Insights Tabs */}
-        {availableInsightTabs.length > 0 && (
+        {/* Portfolio News */}
+        {canShowNews && (
           <section className="mt-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-[#0d1117]">Insights</h2>
+              <h2 className="text-base font-semibold text-[#0d1117]">Portfolio News</h2>
               <button
                 onClick={() => setShowInsightsSection((prev) => !prev)}
                 className="inline-flex items-center gap-1 text-sm text-[#3a5260] hover:text-[#0d1117]"
@@ -833,68 +1000,14 @@ export default function PortfolioPage() {
 
             {showInsightsSection && (
             <>
-            <div className="bg-white rounded-xl border border-[#cae7ee] p-2 sm:p-3 mb-6">
-              <div className="flex flex-wrap gap-2">
-                {canShowScenario && (
-                  <button
-                    onClick={() => setActiveInsightTab('scenario')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activeInsightTab === 'scenario'
-                        ? 'bg-[#6366f1] text-white'
-                        : 'text-[#3a5260] hover:bg-[#f0f8fa]'
-                    }`}
-                  >
-                    Scenario Analysis
-                  </button>
-                )}
-                {canShowVar && (
-                  <button
-                    onClick={() => setActiveInsightTab('var')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activeInsightTab === 'var'
-                        ? 'bg-[#6366f1] text-white'
-                        : 'text-[#3a5260] hover:bg-[#f0f8fa]'
-                    }`}
-                  >
-                    Tail Risk (VaR/CVaR)
-                  </button>
-                )}
-                {canShowNews && (
-                  <button
-                    onClick={() => setActiveInsightTab('news')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      activeInsightTab === 'news'
-                        ? 'bg-[#6366f1] text-white'
-                        : 'text-[#3a5260] hover:bg-[#f0f8fa]'
-                    }`}
-                  >
-                    Portfolio News
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {activeInsightTab === 'scenario' && canShowScenario && (
-              <ScenarioAnalysis scenarios={scenarios} compact={true} />
-            )}
-
-            {activeInsightTab === 'var' && canShowVar && (
-              <VarAnalysis onCalculate={getPortfolioVar} compact={true} />
-            )}
-
-            {activeInsightTab === 'news' && canShowNews && (
-              <section>
-                <h2 className="text-2xl font-bold text-[#0d1117] mb-6">
-                  Portfolio News & Sentiment
-                </h2>
-                <NewsFeed 
-                  articles={news} 
-                  onRefresh={handleRefreshNews}
-                  loading={newsLoading}
-                  compact={true}
-                />
-              </section>
-            )}
+            <section>
+              <NewsFeed 
+                articles={news} 
+                onRefresh={handleRefreshNews}
+                loading={newsLoading}
+                compact={true}
+              />
+            </section>
             </>
             )}
           </section>
@@ -914,6 +1027,7 @@ export default function PortfolioPage() {
                   setSearchResult(null);
                   setSearchError(null);
                   setNewPurchaseDate('');
+                  setNewWalletId('');
                 }}
                 className="p-2 text-[#7a9fad] hover:text-[#3a5260] hover:bg-[#f0f8fa] rounded-lg"
               >
@@ -966,7 +1080,7 @@ export default function PortfolioPage() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#3a5260] mb-1">Quantity</label>
                     <input
@@ -992,6 +1106,21 @@ export default function PortfolioPage() {
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-[#3a5260] mb-1">Wallet</label>
+                    <select
+                      value={newWalletId}
+                      onChange={(e) => setNewWalletId(e.target.value)}
+                      className="w-full px-3 py-2 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(85,178,201,0.3)]"
+                    >
+                      <option value="">Main Portfolio (no wallet)</option>
+                      {wallets.map((wallet) => (
+                        <option key={wallet.id} value={wallet.id}>
+                          {wallet.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-[#3a5260] mb-1">Buy Date</label>
                     <input
                       type="date"
@@ -1013,6 +1142,7 @@ export default function PortfolioPage() {
                   setSearchResult(null);
                   setSearchError(null);
                   setNewPurchaseDate('');
+                  setNewWalletId('');
                 }}
                 className="flex-1 px-4 py-2 border border-[#cae7ee] text-[#3a5260] rounded-lg hover:bg-[#f0f8fa]"
               >
@@ -1039,6 +1169,7 @@ export default function PortfolioPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

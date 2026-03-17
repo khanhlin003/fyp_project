@@ -1,0 +1,13 @@
+\chapter{Conclusions and Future Work}
+
+\section{Conclusions}
+\label{sec:achievements}
+This project successfully delivered a comprehensive web-based platform that empowers retail investors to navigate the complex ETF landscape. By aggregating data from over 2,200 ETFs and 5.7 million historical price records, the system provides professional-grade analytics—including beta, Sharpe ratio, and Value at Risk (VaR)—typically reserved for institutional users. The technical architecture, built on Next.js 14 and FastAPI, integrates an AI-powered educational chatbot and a multi-factor recommendation engine. 
+
+\section{Limitations and Lessons Learned}
+\label{sec:limitations}
+Despite its successful deployment, the platform faces several constraints. Market coverage is currently restricted to the US and Singapore, and price updates are limited by daily API refreshes rather than real-time data streams. From a modeling perspective, the recommendation engine utilizes a rule-based scoring system rather than predictive machine learning, and the VaR calculations assume a normal distribution of returns, which may underestimate risk during extreme market volatility. Furthermore, the absence of multi-currency support and direct trade execution requires users to manually bridge the gap between analysis and portfolio management through external brokerages.
+
+\section{Future Work}
+\label{sec:future-work}
+The development roadmap aims to transition the platform from a purely educational tool to a comprehensive investment ecosystem. In the immediate future, rule-based scoring will be replaced with neural collaborative filtering models, and WebSocket integration will enable live intraday price updates. Medium-term goals focus on expanding market coverage to include European UCITS ETFs and implementing backtesting engines that allow users to simulate historical portfolio performance. The long-term vision involves the development of native mobile applications and the integration of brokerage APIs to enable seamless trade execution. Ultimately, these enhancements aim to foster a community-driven platform where sophisticated analytics and financial literacy are available to all.

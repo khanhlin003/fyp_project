@@ -1,0 +1,424 @@
+\chapter{Use Case Specifications}
+\label{appendix:use-cases}
+
+\renewcommand{\arraystretch}{1.0} % row spacing
+
+%-------------------------------------------------------------------
+\section{UC-01: Register Account}
+\label{uc:register}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-01 \\ \hline
+Use Case Name & Register Account \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & Enables a new user to create an account on the platform by providing valid registration credentials. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User has access to the platform via a supported web browser.
+    \item User does not already have an account associated with the provided email address.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User navigates to the registration page.
+    \item User enters a valid email address.
+    \item User enters a password with a minimum length of six characters.
+    \item User confirms the password.
+    \item User submits the registration form.
+    \item System validates the input fields.
+    \item System creates a new user account.
+    \item System authenticates the user and redirects them to the risk questionnaire.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Email Already Registered} \newline
+At Step 6, if the email already exists, the system displays an error message. \newline
+\textbf{AF-2: Invalid Input} \newline
+If validation fails, the system highlights invalid fields and prompts correction. \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User account created and authenticated via JWT.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Password must be \textbf{\ge} 6 characters and securely hashed.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-02: Login / Authenticate}
+\label{uc:login}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-02 \\ \hline
+Use Case Name & Login / Authenticate \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & Allows an existing user to log in to the platform using registered credentials. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User has a registered account.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User navigates to the login page.
+    \item User enters email and password.
+    \item User submits login request.
+    \item System validates credentials.
+    \item System issues authentication token (JWT).
+    \item System redirects user to dashboard.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Invalid Credentials} \newline
+If credentials are incorrect, system displays an authentication error. \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User is authenticated and logged in.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Tokens expire after a predefined duration.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-03: Take Risk Questionnaire}
+\label{uc:questionnaire}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-03 \\ \hline
+Use Case Name & Take Risk Questionnaire \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User completes a psychometric questionnaire to determine their investment risk profile. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User is authenticated.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User navigates to questionnaire page.
+    \item System displays multiple-choice questions.
+    \item User selects answers and submits.
+    \item System calculates total score.
+    \item System assigns risk profile (Conservative / Balanced / Aggressive).
+\end{enumerate} \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User risk profile is saved for recommendations.
+\end{itemize} \\ \hline
+Business Rules &
+\textbf{Score Classification:} Thresholds are loaded from quiz configuration and mapped to Conservative / Balanced / Aggressive profiles. \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-04: Search and Filter ETFs}
+\label{uc:search-filter}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-04 \\ \hline
+Use Case Name & Search \& Filter ETFs \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & Allows user to search and filter ETFs by name, sector, risk profile, or other metrics. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User has access to ETF discovery page.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User navigates to the ETF search page.
+    \item User enters search criteria or selects filters.
+    \item System applies filters and displays results.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: No Results Found} \newline
+System displays “No ETFs found matching your criteria.” \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Filtered ETF list is displayed to the user.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Filters must respect user risk profile and platform limits.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-05: View ETF Details \& Charts}
+\label{uc:view-etf}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-05 \\ \hline
+Use Case Name & View ETF Details \& Charts \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User views detailed information and performance charts for a selected ETF. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User has access to ETF detail page.
+    \item ETF selected from search or recommendations.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User selects an ETF.
+    \item System retrieves ETF data (price history, risk metrics).
+    \item System displays detailed info and charts.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Data Unavailable} \newline
+System shows “ETF data not available” and logs error. \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User can review ETF metrics and charts.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Charts must reflect accurate historical data.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-06: Get Recommendations}
+\label{uc:recommendations}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-06 \\ \hline
+Use Case Name & Get Recommendations \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & System provides ETF recommendations based on user risk profile and sentiment analysis. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User has selected a risk profile (from quiz result or manual profile selection).
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User navigates to “Recommendations” page.
+    \item System retrieves selected risk profile and relevant ETF attributes.
+    \item System generates and displays ETF recommendations.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: No Recommendations} \newline
+System displays “No suitable ETFs available at this time.” \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User can view recommended ETFs.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Recommendations must always match risk profile constraints and rule-based scoring logic.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-07: Manage Portfolio}
+\label{uc:manage-portfolio}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-07 \\ \hline
+Use Case Name & Manage Portfolio \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User can add, remove, or update ETFs in their portfolio and track performance. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User is authenticated.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User accesses portfolio page.
+    \item User adds/removes ETFs or updates holdings.
+    \item System recalculates portfolio performance.
+    \item System displays updated metrics and charts.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Invalid Entry} \newline
+System prompts correction for invalid ETF or holding data. \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Portfolio reflects updated ETFs and performance metrics.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Portfolio calculations must respect all user holdings and risk constraints.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-08: Run Scenario Analysis}
+\label{uc:scenario}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-08 \\ \hline
+Use Case Name & Run Scenario Analysis \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User runs stress testing and VaR analysis on portfolio, wallet, or selected ETF holdings. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User is authenticated.
+    \item At least one analysis target exists (portfolio, wallet, or ETF).
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User opens the scenario analysis page.
+    \item User selects analysis target type (portfolio, wallet, or ETF).
+    \item User selects a scenario (e.g., COVID crash or stress-10/stress-20/stress-30).
+    \item System simulates performance and returns impact metrics.
+    \item User optionally runs VaR/CVaR for the selected target.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Missing Data} \newline
+System interpolates missing historical data or flags errors. \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User receives scenario impact and risk results for the selected target.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Scenario analysis uses available historical price data and selected target holdings.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-11: Manage Wallets}
+\label{uc:manage-wallets}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-11 \\ \hline
+Use Case Name & Manage Wallets \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User creates, updates, and deactivates goal-based wallets for organizing investments. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User is authenticated.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User opens the wallet management page.
+    \item User creates a new wallet by entering wallet name and purpose.
+    \item System creates the wallet and initializes default wallet profile settings.
+    \item User optionally updates wallet profile fields (risk profile, horizon, objective, and liquidity settings).
+    \item User may deactivate an existing wallet.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Invalid Wallet Input} \newline
+System prompts user to correct invalid values (for example name too short or invalid profile ranges). \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Wallet records and wallet profile settings are updated for the authenticated user.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Wallet operations are user-scoped; users can only manage their own wallets.
+    \item Deactivation marks wallet as inactive rather than deleting historical data.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-12: Assign Holdings to Wallet}
+\label{uc:assign-wallet}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-12 \\ \hline
+Use Case Name & Assign Holdings to Wallet \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User assigns a portfolio holding to a selected wallet for goal-based grouping and analytics. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User is authenticated.
+    \item User has at least one existing wallet.
+    \item User has at least one portfolio holding.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User selects an existing holding from portfolio or wallet interface.
+    \item User chooses a target wallet.
+    \item System updates wallet assignment for the holding.
+    \item System refreshes wallet holdings and portfolio summaries.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Wallet Not Found or Inactive} \newline
+System returns an error and asks user to select an active wallet. \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Holding is mapped to the selected wallet and reflected in wallet-level views.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item A holding can be mapped to one active wallet assignment at a time.
+    \item Assignment changes trigger recalculation of wallet-level current value and allocation outputs.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-09: Ask AI Chatbot}
+\label{uc:chatbot}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-09 \\ \hline
+Use Case Name & Ask AI Chatbot \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User asks questions about ETFs, portfolios, or investment guidance and receives responses from the AI chatbot. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User is authenticated.
+    \item Chatbot service is online.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User inputs question into chatbot interface.
+    \item System processes query using AI model.
+    \item System returns answer or advice to user.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: Query Not Understood} \newline
+System responds: “I’m sorry, I didn’t understand your question.” \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User receives AI response or guidance.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item Responses must comply with platform guidelines and factual accuracy.
+\end{itemize} \\ \hline
+\end{longtable}
+
+%-------------------------------------------------------------------
+\section{UC-10: View News Sentiment}
+\label{uc:news-sentiment}
+
+\begin{longtable}{|>{\raggedright\arraybackslash\bfseries}p{3.5cm}|p{11cm}|}
+\hline
+\rowcolor{gray!15} Use Case ID & UC-10 \\ \hline
+Use Case Name & View News Sentiment \\ \hline
+Primary Actor & Retail Investor \\ \hline
+Description & User views ETF and portfolio-related news with sentiment labels and alerts. \\ \hline
+Preconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item News data source is available.
+    \item User has selected a ticker or portfolio context.
+\end{itemize} \\ \hline
+Main Flow &
+\begin{enumerate}[leftmargin=*, nosep]
+    \item User opens a ticker detail page or portfolio dashboard.
+    \item System retrieves recent related news articles.
+    \item System displays sentiment labels and relevance details.
+    \item User reviews alerts and article links.
+\end{enumerate} \\ \hline
+Alternative Flows &
+\textbf{AF-1: API Failure} \newline
+System retries up to 3 times, then logs error. \\ \hline
+Postconditions &
+\begin{itemize}[leftmargin=*, nosep]
+    \item User sees current sentiment-tagged news for decision support.
+\end{itemize} \\ \hline
+Business Rules &
+\begin{itemize}[leftmargin=*, nosep]
+    \item News windows are query-driven (for example last N days), not fixed to a single 24-hour window.
+    \item Sentiment scores normalized between -1 and +1.
+\end{itemize} \\ \hline
+\end{longtable}

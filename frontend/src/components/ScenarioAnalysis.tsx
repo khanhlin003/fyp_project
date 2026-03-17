@@ -1,17 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingDown, AlertTriangle, BarChart3, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { AxiosError } from 'axios';
+import { TrendingDown, BarChart3, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { analyzeScenario, ScenarioOption, ScenarioResult } from '@/lib/api';
+
+type AnalysisTargetType = 'portfolio' | 'wallet' | 'etf';
 
 interface ScenarioAnalysisProps {
   scenarios: ScenarioOption[];
+  wallets: Array<{ id: number; name: string }>;
+  tickers: string[];
   onAnalyze?: (result: ScenarioResult) => void;
   compact?: boolean;
 }
 
-export default function ScenarioAnalysis({ scenarios, onAnalyze, compact = false }: ScenarioAnalysisProps) {
+export default function ScenarioAnalysis({ scenarios, wallets, tickers, onAnalyze, compact = false }: ScenarioAnalysisProps) {
   const [selectedScenario, setSelectedScenario] = useState<string>('covid-crash');
+  const [targetType, setTargetType] = useState<AnalysisTargetType>('portfolio');
+  const [selectedWalletId, setSelectedWalletId] = useState<number | null>(null);
+  const [selectedTicker, setSelectedTicker] = useState<string>('');
   const [result, setResult] = useState<ScenarioResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,14 +28,31 @@ export default function ScenarioAnalysis({ scenarios, onAnalyze, compact = false
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
+
+    if (targetType === 'wallet' && !selectedWalletId) {
+      setError('Please select a wallet to analyze.');
+      setLoading(false);
+      return;
+    }
+
+    if (targetType === 'etf' && !selectedTicker) {
+      setError('Please select an ETF ticker to analyze.');
+      setLoading(false);
+      return;
+    }
     
     try {
-      const data = await analyzeScenario(selectedScenario);
+      const data = await analyzeScenario(selectedScenario, undefined, {
+        target_type: targetType,
+        wallet_id: targetType === 'wallet' ? selectedWalletId || undefined : undefined,
+        ticker: targetType === 'etf' ? selectedTicker : undefined,
+      });
       setResult(data);
       setShowDetails(true);
       onAnalyze?.(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to analyze scenario');
+    } catch (err: unknown) {
+      const axiosErr = err as AxiosError<{ detail?: string }>;
+      setError(axiosErr.response?.data?.detail || 'Failed to analyze scenario');
     } finally {
       setLoading(false);
     }
@@ -49,28 +74,80 @@ export default function ScenarioAnalysis({ scenarios, onAnalyze, compact = false
 
   return (
     <div className={`bg-white rounded-lg shadow-[0_4px_16px_rgba(85,178,201,0.12)] border-[1.5px] border-[#cae7ee] ${compact ? 'p-4' : 'p-6'}`}>
-      <div className={`flex items-center gap-2 ${compact ? 'mb-4' : 'mb-6'}`}>
-        <AlertTriangle className="w-6 h-6 text-[#d4860a]" />
-        <h2 className={`${compact ? 'text-xl' : 'text-2xl'} font-bold`}>Scenario Analysis</h2>
-      </div>
-
       {/* Scenario Selector */}
       <div className={compact ? 'mb-4' : 'mb-6'}>
-        <label className="block text-sm font-medium text-[#3a5260] mb-2">
-          Select Scenario
-        </label>
-        <select
-          value={selectedScenario}
-          onChange={(e) => setSelectedScenario(e.target.value)}
-          className="w-full px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1]"
-          disabled={loading}
-        >
-          {scenarios.map((scenario) => (
-            <option key={scenario.id} value={scenario.id}>
-              {scenario.name} - {scenario.description}
-            </option>
-          ))}
-        </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div>
+            <label className="block text-sm font-medium text-[#3a5260] mb-2">
+              Analyze Scope
+            </label>
+            <select
+              value={targetType}
+              onChange={(e) => {
+                const nextTarget = e.target.value as AnalysisTargetType;
+                setTargetType(nextTarget);
+                if (nextTarget !== 'wallet') setSelectedWalletId(null);
+                if (nextTarget !== 'etf') setSelectedTicker('');
+              }}
+              className="w-full px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1]"
+              disabled={loading}
+            >
+              <option value="portfolio">Total Portfolio</option>
+              <option value="wallet">Each Wallet</option>
+              <option value="etf">Single ETF</option>
+            </select>
+
+            {targetType === 'wallet' && (
+              <select
+                value={selectedWalletId ?? ''}
+                onChange={(e) => setSelectedWalletId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full mt-3 px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1]"
+                disabled={loading}
+              >
+                <option value="">Select Wallet</option>
+                {wallets.map((wallet) => (
+                  <option key={wallet.id} value={wallet.id}>
+                    {wallet.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {targetType === 'etf' && (
+              <select
+                value={selectedTicker}
+                onChange={(e) => setSelectedTicker(e.target.value)}
+                className="w-full mt-3 px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1]"
+                disabled={loading}
+              >
+                <option value="">Select ETF</option>
+                {tickers.map((ticker) => (
+                  <option key={ticker} value={ticker}>
+                    {ticker}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#3a5260] mb-2">
+              Select Scenario
+            </label>
+            <select
+              value={selectedScenario}
+              onChange={(e) => setSelectedScenario(e.target.value)}
+              className="w-full px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1]"
+              disabled={loading}
+            >
+              {scenarios.map((scenario) => (
+                <option key={scenario.id} value={scenario.id}>
+                  {scenario.name} - {scenario.description}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         {selectedScenarioData && (
           <div className="mt-3 p-3 bg-[#f7fbfc] rounded-lg">

@@ -4,8 +4,6 @@
 
 Exchange-Traded Funds (ETFs) represent one of the most significant financial innovations of the last three decades. An ETF is a pooled investment security that operates similarly to a mutual fund but trades on a stock exchange throughout the day at market-determined prices. The modern ETF era is widely attributed to the 1993 launch of the Standard \& Poor’s Depositary Receipts (SPDR), commonly known by its ticker symbol ``SPY,'' which tracks the S\&P 500 Index \cite{spy2025}.
 
-For a reader outside finance, an ETF can be understood as a wrapper that allows an investor to buy many securities through a single trade. Instead of selecting and purchasing dozens of individual shares or bonds, the investor buys one ETF unit and immediately gains exposure to a pre-defined basket of assets. This packaging function is one of the main reasons ETFs are widely used in retail investing: they simplify diversification, reduce operational complexity, and make market access easier for non-professional users.
-
 Since 1993, the ETF market has expanded into a diverse ecosystem that includes:
 
 \begin{itemize}
@@ -15,25 +13,15 @@ Since 1993, the ETF market has expanded into a diverse ecosystem that includes:
     \item \textbf{Sector and Thematic ETFs:} Focused on specific industries (e.g., Technology) or investment themes (e.g., Clean Energy).
 \end{itemize}
 
-This classification is important because ETF labels can appear simple while the underlying economic exposure can differ significantly. For example, two technology ETFs may both be described as ``tech funds,'' yet one may track large US firms by market capitalization while another may focus on smaller high-growth companies or a narrow subsector such as semiconductors. In practice, investors therefore need to look beyond the name of the fund and examine benchmark design, geographic exposure, weighting methodology, and cost structure.
-
 The structural foundation of ETFs lies in the creation and redemption mechanism managed by Authorized Participants (APs). Unlike mutual funds, which are priced only at the end of the trading day based on Net Asset Value (NAV), ETFs allow APs to exchange baskets of underlying securities for ETF shares and vice versa. This arbitrage mechanism ensures that ETF market prices remain closely aligned with their intrinsic value. Compared to traditional mutual funds, ETFs generally offer lower expense ratios, improved tax efficiency, and higher liquidity, although they typically lack discretionary alpha-seeking stock selection.
-
-From a market-structure perspective, ETFs operate across two linked layers. In the \textit{primary market}, APs create or redeem ETF shares directly with the fund provider. In the \textit{secondary market}, ordinary investors buy and sell those shares on an exchange in the same way they would trade a stock. This distinction matters because it explains why ETF liquidity does not depend only on the number of shares visibly traded on-screen; it also depends on the liquidity of the underlying securities and the ability of APs to arbitrage price differences.
-
-Two practical concepts follow from this mechanism. First, the \textit{bid--ask spread} measures the difference between the price at which market participants are willing to buy and sell the ETF at a given moment; narrower spreads usually indicate better trading efficiency. Second, \textit{tracking difference} refers to the gap between the ETF's actual return and the return of the index it aims to replicate. Even low-cost ETFs may not perfectly match their benchmarks because of fees, portfolio rebalancing frictions, withholding taxes, cash drag, and replication constraints. These issues are especially relevant in a recommendation platform because a fund that appears attractive from headline returns alone may still be less efficient than a comparable alternative.
 
 \section{Financial Performance and Risk Metrics}
 
 Evaluating financial instruments requires a multi-dimensional framework that accounts for both return and risk-adjusted performance.
 
-For non-specialist users, it is useful to separate financial metrics into three broad categories: \textit{descriptive metrics}, which summarise what has happened historically; \textit{comparative metrics}, which help compare one ETF against another or against a benchmark; and \textit{risk metrics}, which approximate the uncertainty or downside associated with holding the fund. A practical screening system rarely relies on a single indicator. Instead, it combines several measures so that no one statistic dominates the interpretation.
-
 \subsection{Core Performance Metrics}
 
 Returns are commonly analyzed across multiple investment horizons, including Year-to-Date (YTD), 1-month, 3-month, 6-month, 1-year, 3-year, and 5-year periods. This approach enables investors to distinguish between short-term momentum and long-term performance stability. However, return analysis alone is insufficient without considering ownership costs, particularly the \textit{Expense Ratio}, which represents the annual operating fees expressed as a percentage of assets under management (AUM).
-
-Another important distinction is between \textit{absolute return} and \textit{relative return}. Absolute return answers the question ``How much did this ETF gain or lose?'' Relative return asks ``How well did this ETF perform compared with another ETF or its benchmark index?'' In an advisory platform, both views are useful. Absolute return is intuitive for retail users, while relative return is necessary when comparing funds that pursue similar mandates but differ in implementation quality.
 
 \subsection{Risk and Volatility}
 
@@ -44,8 +32,6 @@ Risk can be quantified using several established statistical measures:
     \item \textbf{Beta ($\beta$):} A measure of systematic risk relative to the broader market, commonly benchmarked against the S\&P 500. A value of $\beta > 1$ indicates higher sensitivity to market fluctuations.
     \item \textbf{Maximum Drawdown (MDD):} The largest observed decline from a peak to a trough, representing the worst historical loss scenario.
 \end{itemize}
-
-These measures should not be interpreted as interchangeable. Volatility captures the overall variability of returns, regardless of whether price movements are upward or downward. Beta focuses on sensitivity to market-wide movements and therefore says more about co-movement with a benchmark than about standalone instability. Maximum drawdown is often the most intuitive measure for retail investors because it directly describes the depth of a historical loss episode. A fund can therefore exhibit moderate volatility but still experience a severe drawdown if losses occur persistently over a prolonged period.
 
 \subsection{Formula Summary}
 \begin{table}[ht]
@@ -73,8 +59,6 @@ $\displaystyle ER = \frac{\text{Total Fund Costs}}{\text{Total Fund Assets}}$ \\
 
 The Sharpe Ratio is particularly important for recommendation systems, as it enables comparison between funds with different volatility profiles by normalizing excess return per unit of risk.
 
-In practical decision-making, no metric should be read in isolation. A high-return ETF may be unattractive if it also exhibits a high drawdown, unstable volatility, or excessive concentration in a single sector. Conversely, a low-cost ETF with modest returns may still be suitable for conservative investors if it provides stable exposure and fits a broader diversification objective. This is why recommendation systems in finance typically use composite scoring rather than a single ranking variable.
-
 \section{Modern Portfolio Theory and Diversification}
 
 Modern Portfolio Theory (MPT), introduced by Harry Markowitz in 1952, asserts that an investment’s risk and return should be evaluated in the context of its contribution to overall portfolio performance rather than in isolation.
@@ -82,22 +66,6 @@ Modern Portfolio Theory (MPT), introduced by Harry Markowitz in 1952, asserts th
 A central concept of MPT is the \textit{Efficient Frontier}, which represents a set of portfolios offering the maximum expected return for a given level of risk. This framework later led to the Capital Asset Pricing Model (CAPM) developed by William Sharpe in 1964, distinguishing between systematic (market-wide) risk and unsystematic (asset-specific) risk.
 
 In the ETF context, MPT provides the theoretical justification for diversification. By combining ETFs with low or negative correlations—such as equities and commodities—investors can reduce unsystematic risk. In this project, MPT principles guide the recommendation engine to ensure that users receive diversified portfolios aligned with their risk tolerance rather than isolated high-performing funds.
-
-An important implication for system design is that portfolio construction is not simply a problem of choosing the ``best'' individual ETF. A technically strong ETF may still be a poor addition to a portfolio if it duplicates exposures the investor already holds. Diversification therefore depends on relationships between assets, especially correlation, rather than on single-fund quality alone. For this reason, portfolio-aware systems often consider both ETF-level scores and interaction effects across holdings.
-
-For retail investors, the intuitive message of MPT is straightforward: diversification is valuable because different assets do not move in exactly the same way at the same time. When one segment of the market performs poorly, another may remain stable or decline less severely. Although diversification cannot eliminate systematic market risk, it can reduce avoidable concentration risk and improve the consistency of long-term outcomes.
-
-\section{Time Series Analysis and Volatility Modelling}
-
-Financial market data is inherently a time series: observations such as prices, returns, trading volume, and macroeconomic indicators are recorded sequentially over time. This temporal structure matters because neighbouring observations are not independent in the same way as rows in a conventional tabular dataset. In finance, recent price behaviour often influences short-term expectations, while structural breaks, economic cycles, and crisis periods can alter statistical properties over time.
-
-One of the most important stylised facts in financial time series is \textit{volatility clustering}. Large price movements tend to be followed by further large movements, and calm periods tend to be followed by additional calm periods. This means that risk is not constant. A platform that reports a single long-run volatility number without considering time variation may therefore understate current market stress or overstate risk during quieter regimes.
-
-Common analytical approaches include rolling-window statistics, moving averages, exponentially weighted volatility estimates, and autoregressive models. More advanced finance literature often uses the ARCH/GARCH family of models to estimate time-varying variance. These models are valuable because they formalise the intuition that recent shocks contain information about future uncertainty. However, they also increase model complexity and may be difficult to explain to non-technical users.
-
-For the present project, the main relevance of time-series analysis is operational rather than purely theoretical. Historical price series are used to compute returns across multiple horizons, rolling risk indicators, and stress outcomes under past market events. This choice balances interpretability and practical usefulness: the system relies on statistics that can be computed robustly from available data and explained clearly to users, while still acknowledging that market risk evolves over time.
-
-This section also clarifies why historical performance charts are useful but insufficient on their own. A price chart shows trajectory, but it does not explicitly quantify the speed, variability, or persistence of change. Time-series methods convert raw sequences into interpretable indicators, allowing the system to support ranking, scenario analysis, and user-facing explanations in a disciplined manner.
 
 \section{Scenario Analysis and Value at Risk}
 
@@ -111,9 +79,7 @@ Value at Risk (VaR) is a statistical technique used to estimate the maximum pote
     \item \textbf{Monte Carlo Simulation:} Generates thousands of simulated price paths based on historical volatility and drift.
 \end{itemize}
 
-While VaR is widely adopted in industry, it underestimates extreme tail risks. Therefore, stress testing is essential to simulate historical crises such as the 2008 Global Financial Crisis or the 2020 COVID-19 market crash, allowing investors to evaluate portfolio resilience under severe conditions.
-
-For non-expert audiences, the distinction between VaR and stress testing should be made explicit. VaR is a probabilistic summary of expected loss under ordinary statistical assumptions over a chosen horizon and confidence level. Stress testing instead asks a counterfactual question: ``What would happen if market conditions resembled a severe historical or hypothetical event?'' The two tools are complementary. VaR offers a compact risk estimate, whereas stress testing is better suited to communicating tail-event intuition.
+While VaR is widely adopted in industry, it can underestimate extreme tail risks. Therefore, stress testing is essential to simulate historical crises such as the 2008 Global Financial Crisis or the 2020 COVID-19 market crash, allowing investors to evaluate portfolio resilience under severe conditions. In the current implementation of this project, the platform emphasizes historical scenario simulation together with historical and parametric VaR outputs, while Monte Carlo simulation is treated as a future extension.
 
 \section{News and Sentiment Analysis in Finance}
 
@@ -122,8 +88,6 @@ The Efficient Market Hypothesis (EMH) posits that asset prices reflect all publi
 Advances in Natural Language Processing (NLP) have enabled the quantification of financial sentiment. Techniques such as the Loughran--McDonald Financial Sentiment Dictionary allow models to distinguish between general negative language and finance-specific negative terminology. Modern APIs leverage transformer-based models to assign sentiment scores ranging from bearish to bullish, providing real-time market insights.
 
 Integrating sentiment analysis into ETF platforms addresses the lag inherent in traditional fundamental data and enables dynamic assessment of thematic trends, such as the impact of regulatory news on sector ETFs.
-
-Nevertheless, sentiment signals must be handled carefully. A positive-sounding headline may not imply a favourable investment outcome if the news is already priced into the market, applies only indirectly to the ETF, or concerns a short-lived event. In addition, ETF-level sentiment can be difficult to infer because many articles discuss constituent companies, sectors, or macro events rather than the ETF instrument itself. A robust platform therefore treats sentiment as a supplementary signal that enriches interpretation rather than as a standalone trading rule.
 
 \section{Recommendation Systems in Finance}
 
@@ -137,15 +101,11 @@ Recommendation systems generally follow three architectural paradigms:
 
 In finance, recommendation systems must be constrained by risk-profile alignment. A recommendation is ineffective if it violates a user’s risk tolerance. Additionally, explainability is critical; users are more likely to trust systems that provide transparent, interpretable justifications for recommendations.
 
-This requirement distinguishes financial recommendation systems from recommendation tasks such as movies or e-commerce products. In entertainment domains, an inaccurate recommendation mainly reduces user satisfaction. In finance, a poor recommendation may expose the user to losses, liquidity mismatches, or unsuitable risk levels. Consequently, system design must incorporate suitability checks, conservative defaults, and clear explanation of why a fund is being suggested.
-
 \section{Large Language Models for Financial Applications}
 
-Large Language Models (LLMs) such as GPT-4 have transformed how users interact with financial data. LLMs enable reasoning, summarization, and natural language explanation of complex financial concepts.
+Large Language Models (LLMs) have transformed how users interact with financial data. LLMs enable reasoning, summarization, and natural language explanation of complex financial concepts.
 
 Key considerations for LLM integration include prompt engineering versus fine-tuning, mitigation of hallucination risks through Retrieval-Augmented Generation (RAG), and ethical constraints to ensure compliance with financial regulations by emphasizing education rather than direct investment advice.
-
-In the context of this project, the role of the LLM is best framed as an explanatory and interaction layer rather than a forecasting oracle. The model is useful for translating quantitative outputs into plain-language answers, summarising ETF characteristics, and helping users interpret risk metrics or portfolio results. It is less suitable as an unconstrained generator of buy-or-sell recommendations. This distinction is important both technically and ethically, because a conversational interface can appear authoritative even when the underlying answer should be presented with uncertainty and caution.
 
 \section{Related Platforms and Comparative Analysis}
 
@@ -193,3 +153,7 @@ This literature review identifies three key research gaps:
 \end{itemize}
 
 By integrating quantitative risk analytics with LLM-based explanations and sentiment analysis, this project bridges the gap between institutional-grade investment tools and retail-level accessibility.
+
+\section{Implementation Tie-Back}
+
+The design choices in this project are guided by practical implementation constraints and explainability goals for retail users. First, recommendations are generated through risk-profile gating and transparent rule-based scoring, instead of opaque black-box prediction models, so users can understand why an ETF is selected or filtered out. Second, the risk profiling and recommendation flow is aligned to a concise profile taxonomy (conservative, balanced, aggressive) that can be consistently applied across user interface, API logic, and portfolio analytics. Third, risk analysis combines historical stress scenarios with historical and parametric VaR outputs to provide interpretable downside estimates while avoiding over-claiming forecast precision in extreme market regimes. Finally, the LLM assistant is positioned as an educational layer that explains metrics, risks, and rationale in natural language, rather than issuing autonomous investment advice.

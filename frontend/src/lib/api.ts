@@ -41,6 +41,8 @@ export interface ETF {
   ytd_return: string | null;
   beta: string | null;
   annual_dividend_yield: string | null;
+  latest_price?: number | null;
+  latest_volume?: number | null;
 }
 
 export interface ETFDetail extends ETF {
@@ -172,6 +174,62 @@ export interface RecommendationResponse {
   };
 }
 
+export interface WalletProfile {
+  risk_profile: string;
+  horizon_months: number | null;
+  objective: string;
+  target_return_min: number | null;
+  target_return_max: number | null;
+  max_drawdown_pct: number | null;
+  liquidity_need: string;
+  experience_level: string;
+  source: string;
+}
+
+export interface InvestmentWallet {
+  id: number;
+  name: string;
+  purpose: string;
+  base_currency: string;
+  is_active: boolean;
+  holdings_count: number;
+  created_at: string;
+  updated_at: string;
+  profile?: WalletProfile | null;
+}
+
+export interface WalletHoldingItem {
+  id: number;
+  wallet_id: number;
+  ticker: string;
+  quantity: number;
+  avg_cost: number | null;
+  latest_price: number | null;
+  current_value: number | null;
+  added_at: string;
+  updated_at: string;
+}
+
+export interface PortfolioHoldingItem {
+  id: number;
+  ticker: string;
+  wallet_id?: number | null;
+  wallet_name?: string | null;
+  quantity: number;
+  purchase_price?: number | null;
+  purchase_date?: string | null;
+  current_price?: number | null;
+}
+
+export interface PortfolioSummaryResponse {
+  total_value: number;
+  total_cost: number;
+  total_gain_loss: number;
+  total_gain_loss_percent: number;
+  holdings_count: number;
+  holdings: PortfolioHoldingItem[];
+}
+
 export interface MacroIndicator {
   indicator_name: string;
   description: string;
@@ -213,6 +271,7 @@ export const getETFs = async (params?: {
   page_size?: number;
   category?: string;
   asset_class?: string;
+  etf_type?: string;
   region?: string;
   search?: string;
 }): Promise<ETFListResponse> => {
@@ -302,6 +361,59 @@ export const getRecommendationProfiles = async () => {
   return data;
 };
 
+// Wallets
+export const getWallets = async (params?: { include_inactive?: boolean; include_profile?: boolean }): Promise<InvestmentWallet[]> => {
+  const { data } = await api.get('/wallets', { params });
+  return data;
+};
+
+export const createWallet = async (payload: { name: string; purpose?: string; base_currency?: string }): Promise<InvestmentWallet> => {
+  const { data } = await api.post('/wallets', payload);
+  return data;
+};
+
+export const updateWallet = async (
+  walletId: number,
+  payload: Partial<Pick<InvestmentWallet, 'name' | 'purpose' | 'base_currency' | 'is_active'>>
+): Promise<InvestmentWallet> => {
+  const { data } = await api.patch(`/wallets/${walletId}`, payload);
+  return data;
+};
+
+export const deactivateWallet = async (walletId: number): Promise<void> => {
+  await api.delete(`/wallets/${walletId}`);
+};
+
+export const getWalletProfile = async (walletId: number): Promise<WalletProfile> => {
+  const { data } = await api.get(`/wallets/${walletId}/profile`);
+  return data;
+};
+
+export const getWalletHoldings = async (walletId: number): Promise<WalletHoldingItem[]> => {
+  try {
+    const { data } = await api.get(`/wallets/${walletId}/holdings`);
+    return data;
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return [];
+    }
+    throw error;
+  }
+};
+
+export const updateWalletProfile = async (
+  walletId: number,
+  payload: Partial<WalletProfile>
+): Promise<WalletProfile> => {
+  const { data } = await api.put(`/wallets/${walletId}/profile`, payload);
+  return data;
+};
+
+export const getPortfolio = async (): Promise<PortfolioSummaryResponse> => {
+  const { data } = await api.get('/portfolio');
+  return data;
+};
+
 // News
 export const getNewsByTicker = async (ticker: string, limit: number = 10): Promise<NewsArticle[]> => {
   const { data } = await api.get(`/news/ticker/${ticker}`, { params: { limit } });
@@ -309,8 +421,15 @@ export const getNewsByTicker = async (ticker: string, limit: number = 10): Promi
 };
 
 export const getPortfolioNews = async (userId: number, limit: number = 20): Promise<NewsArticle[]> => {
-  const { data } = await api.get(`/news/portfolio/${userId}`, { params: { limit } });
-  return data.articles || [];
+  try {
+    const { data } = await api.get(`/news/portfolio/${userId}`, { params: { limit } });
+    return data.articles || [];
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      return [];
+    }
+    throw error;
+  }
 };
 
 export const getNewsAlerts = async (
@@ -394,6 +513,14 @@ export interface ScenarioResult {
   };
 }
 
+export type AnalysisTargetType = 'portfolio' | 'wallet' | 'etf';
+
+export interface AnalysisTargetParams {
+  target_type?: AnalysisTargetType;
+  wallet_id?: number;
+  ticker?: string;
+}
+
 export const getAvailableScenarios = async (): Promise<ScenarioOption[]> => {
   const { data } = await api.get('/scenarios/available');
   return data.scenarios;
@@ -401,10 +528,14 @@ export const getAvailableScenarios = async (): Promise<ScenarioOption[]> => {
 
 export const analyzeScenario = async (
   scenarioId: string,
-  holdings?: Array<{ ticker: string; quantity: number; purchase_price: number }>
+  holdings?: Array<{ ticker: string; quantity: number; purchase_price: number }>,
+  target?: AnalysisTargetParams
 ): Promise<ScenarioResult> => {
   const { data } = await api.post('/scenarios/analyze', {
     scenario_id: scenarioId,
+    target_type: target?.target_type || 'portfolio',
+    wallet_id: target?.wallet_id,
+    ticker: target?.ticker,
     holdings: holdings || undefined
   });
   return data;
@@ -461,12 +592,16 @@ export interface VarResult {
 
 export const getPortfolioVar = async (
   confidenceLevel: number = 0.95,
-  timeHorizonDays: number = 252
+  timeHorizonDays: number = 252,
+  target?: AnalysisTargetParams
 ): Promise<VarResult> => {
   const { data } = await api.get('/scenarios/var', {
     params: { 
       confidence_level: confidenceLevel, 
-      time_horizon_days: timeHorizonDays 
+      time_horizon_days: timeHorizonDays,
+      target_type: target?.target_type || 'portfolio',
+      wallet_id: target?.wallet_id,
+      ticker: target?.ticker,
     }
   });
   return data;

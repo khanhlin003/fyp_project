@@ -4,22 +4,50 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getQuizQuestions, submitQuiz, QuizQuestion, QuizResult } from '@/lib/api';
-import { ChevronLeft, ChevronRight, Check, Loader2, AlertCircle } from 'lucide-react';
+import { Check, Loader2, AlertCircle, X } from 'lucide-react';
 
 export default function QuestionnairePage() {
   const router = useRouter();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<QuizResult | null>(null);
   const [quizTitle, setQuizTitle] = useState('');
+  const [isEditingQuiz, setIsEditingQuiz] = useState(false);
 
   useEffect(() => {
     fetchQuestions();
+    hydrateSavedResult();
   }, []);
+
+  const hydrateSavedResult = () => {
+    try {
+      const savedResult = localStorage.getItem('latestQuizResult');
+      if (!savedResult) return;
+
+      const parsed = JSON.parse(savedResult) as QuizResult;
+      setResult(parsed);
+
+      const hydratedAnswers = parsed.breakdown.reduce<Record<string, string>>((acc, item) => {
+        acc[`q${item.question_id}`] = item.selected_option;
+        return acc;
+      }, {});
+
+      setAnswers(hydratedAnswers);
+    } catch (storageError) {
+      console.error('Failed to load saved quiz result:', storageError);
+    }
+  };
+
+  const handleCloseQuiz = () => {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/');
+  };
 
   const fetchQuestions = async () => {
     try {
@@ -36,21 +64,9 @@ export default function QuestionnairePage() {
     }
   };
 
-  const handleOptionSelect = (optionId: string) => {
-    const questionKey = `q${questions[currentQuestion].question_id}`;
+  const handleOptionSelect = (questionId: number, optionId: string) => {
+    const questionKey = `q${questionId}`;
     setAnswers(prev => ({ ...prev, [questionKey]: optionId }));
-  };
-
-  const goToNext = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
-    }
-  };
-
-  const goToPrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(prev => prev - 1);
-    }
   };
 
   const handleSubmit = async () => {
@@ -59,6 +75,8 @@ export default function QuestionnairePage() {
       setError(null);
       const quizResult = await submitQuiz(answers);
       setResult(quizResult);
+      setIsEditingQuiz(false);
+      localStorage.setItem('latestQuizResult', JSON.stringify(quizResult));
     } catch (err) {
       setError('Failed to submit quiz. Please try again.');
       console.error(err);
@@ -67,14 +85,14 @@ export default function QuestionnairePage() {
     }
   };
 
-  const progress = questions.length > 0 
-    ? ((currentQuestion + 1) / questions.length) * 100 
-    : 0;
+  const answeredCount = questions.reduce((count, question) => {
+    const questionKey = `q${question.question_id}`;
+    return answers[questionKey] ? count + 1 : count;
+  }, 0);
 
-  const currentQuestionData = questions[currentQuestion];
-  const currentAnswer = currentQuestionData 
-    ? answers[`q${currentQuestionData.question_id}`] 
-    : null;
+  const progress = questions.length > 0 
+    ? (answeredCount / questions.length) * 100 
+    : 0;
 
   const allAnswered = questions.length > 0 && 
     questions.every(q => answers[`q${q.question_id}`]);
@@ -116,8 +134,18 @@ export default function QuestionnairePage() {
   }
 
   // Result state
-  if (result) {
-    return <ResultScreen result={result} />;
+  if (result && !isEditingQuiz) {
+    return (
+      <ResultScreen
+        result={result}
+        questions={questions}
+        onClose={handleCloseQuiz}
+        onEdit={() => {
+          setIsEditingQuiz(true);
+          setError(null);
+        }}
+      />
+    );
   }
 
   return (
@@ -130,128 +158,114 @@ export default function QuestionnairePage() {
         />
       </div>
 
-      {/* Question Counter */}
-      <div className="text-center pt-6 pb-2">
+      {/* Status Bar */}
+      <div className="max-w-5xl mx-auto px-4 pt-6 pb-2 flex items-center justify-between gap-3">
         <span className="text-sm text-zinc-500 font-medium">
-          Question {currentQuestion + 1} of {questions.length}
+          {answeredCount} of {questions.length} answered
         </span>
+        <div className="flex items-center gap-2">
+          {result && (
+            <button
+              type="button"
+              onClick={() => setIsEditingQuiz(false)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-zinc-600 rounded-lg border border-zinc-200 hover:bg-zinc-100 transition-colors"
+            >
+              Keep Saved Result
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCloseQuiz}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-zinc-600 rounded-lg border border-zinc-200 hover:bg-zinc-100 transition-colors"
+            aria-label="Close risk quiz"
+          >
+            <X className="w-4 h-4" />
+            <span>Close</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
-      <main className="pt-4 pb-32 px-4">
-        <div className="max-w-2xl mx-auto">
-          {/* Question Card */}
-          <div 
-            key={currentQuestion}
-            className="bg-white rounded-2xl shadow-sm border border-zinc-100 p-6 sm:p-10 animate-fadeIn"
-          >
-            {/* Question Number & Category */}
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-sm">
-                {currentQuestion + 1}
-              </span>
-              <span className="text-sm text-zinc-500 font-medium">
-                {currentQuestionData?.question_type === 'multiple_select' ? 'Select all that apply' : 'Select one'}
-              </span>
+      <main className="pt-4 pb-12 px-4">
+        <div className="max-w-5xl mx-auto lg:grid lg:grid-cols-[minmax(0,1fr)_170px] lg:gap-5">
+          <div className="max-w-2xl w-full lg:justify-self-center">
+            <div className="bg-indigo-50 border border-indigo-100 text-indigo-900 rounded-xl px-3 py-2.5 mb-4 text-xs sm:text-sm font-medium">
+              Quick check: answer these 8 questions to map your timeline, goal, and risk comfort before we recommend ETFs.
             </div>
 
-            {/* Question Text */}
-            <h2 className="text-xl sm:text-2xl font-semibold text-zinc-900 mb-8 leading-relaxed">
-              {currentQuestionData?.question_text}
-            </h2>
+            <div className="space-y-4">
+              {questions.map((question, idx) => {
+                const questionKey = `q${question.question_id}`;
+                const selectedAnswer = answers[questionKey];
 
-            {/* Options */}
-            <div className="space-y-3">
-              {currentQuestionData?.options.map((option) => {
-                const isSelected = currentAnswer === option.option_id;
                 return (
-                  <button
-                    key={option.option_id}
-                    onClick={() => handleOptionSelect(option.option_id)}
-                    className={`w-full text-left p-4 sm:p-5 rounded-xl border-2 transition-all duration-200 group ${
-                      isSelected
-                        ? 'border-indigo-500 bg-indigo-50/60'
-                        : 'border-zinc-200 hover:border-indigo-300 hover:bg-zinc-50'
-                    }`}
+                  <section
+                    key={question.question_id}
+                    id={`question-${question.question_id}`}
+                    className="bg-white rounded-xl shadow-sm border border-zinc-100 p-4 sm:p-5 animate-fadeIn"
                   >
-                    <div className="flex items-center gap-4">
-                      <span className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all ${
-                        isSelected
-                          ? 'border-indigo-500 bg-indigo-500 text-white'
-                          : 'border-zinc-300 text-zinc-500 group-hover:border-indigo-400'
-                      }`}>
-                        {isSelected ? <Check className="w-4 h-4" /> : option.option_id}
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <span className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-semibold text-xs">
+                        {idx + 1}
                       </span>
-                      <span className={`flex-1 ${isSelected ? 'text-indigo-900 font-medium' : 'text-zinc-700'}`}>
-                        {option.text}
+                      <span className="text-xs text-zinc-500 font-medium">
+                        Select one
                       </span>
                     </div>
-                  </button>
+
+                    <h2 className="text-base sm:text-lg font-semibold text-zinc-900 mb-4 leading-relaxed">
+                      {question.question_text}
+                    </h2>
+
+                    <div className="space-y-2.5">
+                      {question.options.map((option) => {
+                        const isSelected = selectedAnswer === option.option_id;
+                        return (
+                          <button
+                            key={option.option_id}
+                            onClick={() => handleOptionSelect(question.question_id, option.option_id)}
+                            className={`w-full text-left p-3.5 sm:p-4 rounded-lg border-2 transition-all duration-200 group ${
+                              isSelected
+                                ? 'border-indigo-500 bg-indigo-50/60'
+                                : 'border-zinc-200 hover:border-indigo-300 hover:bg-zinc-50'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-medium transition-all ${
+                                isSelected
+                                  ? 'border-indigo-500 bg-indigo-500 text-white'
+                                  : 'border-zinc-300 text-zinc-500 group-hover:border-indigo-400'
+                              }`}>
+                                {isSelected ? <Check className="w-4 h-4" /> : option.option_id}
+                              </span>
+                              <span className={`flex-1 text-sm sm:text-[15px] ${isSelected ? 'text-indigo-900 font-medium' : 'text-zinc-700'}`}>
+                                {option.text}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
                 );
               })}
             </div>
-          </div>
 
-          {/* Navigation Dots */}
-          <div className="flex justify-center gap-1.5 mt-8">
-            {questions.map((_, idx) => {
-              const questionKey = `q${questions[idx].question_id}`;
-              const isAnswered = !!answers[questionKey];
-              const isCurrent = idx === currentQuestion;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => setCurrentQuestion(idx)}
-                  className={`w-2.5 h-2.5 rounded-full transition-all ${
-                    isCurrent
-                      ? 'bg-indigo-500 w-6'
-                      : isAnswered
-                      ? 'bg-indigo-300 hover:bg-indigo-400'
-                      : 'bg-zinc-300 hover:bg-zinc-400'
-                  }`}
-                  title={`Question ${idx + 1}`}
-                />
-              );
-            })}
-          </div>
-        </div>
-      </main>
+            {!allAnswered && (
+              <p className="text-xs sm:text-sm text-zinc-500 mt-5">
+                Please answer all questions to unlock the result button.
+              </p>
+            )}
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-xl border-t border-zinc-200 p-4">
-        <div className="max-w-2xl mx-auto flex justify-between items-center">
-          <button
-            onClick={goToPrevious}
-            disabled={currentQuestion === 0}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium transition-all ${
-              currentQuestion === 0
-                ? 'text-zinc-300 cursor-not-allowed'
-                : 'text-zinc-600 hover:bg-zinc-100'
-            }`}
-          >
-            <ChevronLeft className="w-5 h-5" />
-            <span className="hidden sm:inline">Previous</span>
-          </button>
-
-          <div className="flex items-center gap-3">
-            {currentQuestion < questions.length - 1 ? (
-              <button
-                onClick={goToNext}
-                disabled={!currentAnswer}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
-                  currentAnswer
-                    ? 'bg-indigo-500 text-white hover:bg-indigo-600'
-                    : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
-                }`}
-              >
-                <span>Next</span>
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            ) : (
+            <div className="mt-6 bg-white rounded-xl border border-zinc-200 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-xs text-zinc-500">Completion</p>
+                <p className="text-sm font-semibold text-zinc-800">{answeredCount} of {questions.length} answered</p>
+              </div>
               <button
                 onClick={handleSubmit}
                 disabled={!allAnswered || submitting}
-                className={`flex items-center gap-2 px-8 py-2.5 rounded-lg font-medium transition-all ${
+                className={`inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   allAnswered && !submitting
                     ? 'bg-emerald-500 text-white hover:bg-emerald-600'
                     : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
@@ -259,26 +273,74 @@ export default function QuestionnairePage() {
               >
                 {submitting ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Analyzing...</span>
                   </>
                 ) : (
                   <>
-                    <Check className="w-5 h-5" />
+                    <Check className="w-4 h-4" />
                     <span>Get Results</span>
                   </>
                 )}
               </button>
-            )}
+            </div>
           </div>
+
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 bg-white rounded-xl border border-zinc-200 p-3">
+              <p className="text-xs font-semibold text-zinc-600 mb-2">Question List</p>
+              <div className="grid grid-cols-4 gap-1.5">
+                {questions.map((question, idx) => {
+                  const questionKey = `q${question.question_id}`;
+                  const isAnswered = !!answers[questionKey];
+
+                  return (
+                    <button
+                      key={question.question_id}
+                      onClick={() => {
+                        const el = document.getElementById(`question-${question.question_id}`);
+                        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                      className={`h-8 rounded-md text-xs font-semibold transition-colors ${
+                        isAnswered
+                          ? 'bg-indigo-500 text-white hover:bg-indigo-600'
+                          : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                      }`}
+                      title={`Question ${idx + 1}`}
+                      aria-label={`Jump to question ${idx + 1}`}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-zinc-500 mt-2">Colored = answered</p>
+            </div>
+          </aside>
         </div>
-      </div>
+      </main>
+
+      {error && (
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm shadow-sm">
+          {error}
+        </div>
+      )}
     </div>
   );
 }
 
 // Result Screen Component
-function ResultScreen({ result }: { result: QuizResult }) {
+function ResultScreen({
+  result,
+  questions,
+  onClose,
+  onEdit,
+}: {
+  result: QuizResult;
+  questions: QuizQuestion[];
+  onClose: () => void;
+  onEdit: () => void;
+}) {
   const router = useRouter();
   
   const getProfileColor = (profile: string) => {
@@ -296,10 +358,44 @@ function ResultScreen({ result }: { result: QuizResult }) {
 
   const colors = getProfileColor(result.risk_profile);
 
+  const getSelectedOptionText = (questionId: number) => {
+    const selected = result.breakdown.find((item) => item.question_id === questionId)?.selected_option;
+    if (!selected) return 'Not specified';
+    const question = questions.find((q) => q.question_id === questionId);
+    if (!question) return selected;
+    return question.options.find((opt) => opt.option_id === selected)?.text || selected;
+  };
+
+  const intentHighlights = [
+    { label: 'Timeline', value: getSelectedOptionText(1) },
+    { label: 'Primary Goal', value: getSelectedOptionText(2) },
+    { label: 'Drawdown Comfort', value: getSelectedOptionText(4) },
+    { label: 'Cash Priority', value: getSelectedOptionText(6) },
+  ];
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <main className="py-8 px-4">
         <div className="max-w-2xl mx-auto">
+          <div className="mb-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-indigo-700 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+            >
+              Edit Quiz
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-zinc-600 rounded-lg border border-zinc-200 hover:bg-zinc-100 transition-colors"
+              aria-label="Close risk quiz"
+            >
+              <X className="w-4 h-4" />
+              <span>Close</span>
+            </button>
+          </div>
+
           {/* Result Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-zinc-100 overflow-hidden">
             {/* Header */}
@@ -319,7 +415,7 @@ function ResultScreen({ result }: { result: QuizResult }) {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-zinc-500 text-sm">Percentile</p>
+                  <p className="text-zinc-500 text-sm">Profile Fit</p>
                   <p className="text-3xl font-bold text-zinc-900">{result.percentage.toFixed(0)}%</p>
                 </div>
               </div>
@@ -345,16 +441,27 @@ function ResultScreen({ result }: { result: QuizResult }) {
                   onClick={() => router.push(`/recommendations?profile=${result.risk_profile.toLowerCase()}`)}
                   className="flex-1 bg-indigo-500 text-white py-3 px-6 rounded-xl font-medium hover:bg-indigo-600 transition-colors text-center"
                 >
-                  View Recommended ETFs
+                  View Top 5 ETF Picks
                 </button>
-                <Link
-                  href="/questionnaire"
-                  onClick={() => window.location.reload()}
+                <button
+                  onClick={onEdit}
                   className="flex-1 border-2 border-zinc-200 text-zinc-600 py-3 px-6 rounded-xl font-medium hover:bg-zinc-50 transition-colors text-center"
                 >
-                  Retake Quiz
-                </Link>
+                  Edit Quiz Answers
+                </button>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-6 bg-white rounded-2xl shadow-sm border border-zinc-100 p-6 sm:p-8">
+            <h2 className="text-lg font-semibold text-zinc-900 mb-4">Your Intent Snapshot</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {intentHighlights.map((item) => (
+                <div key={item.label} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                  <p className="text-xs text-zinc-500 mb-1">{item.label}</p>
+                  <p className="text-sm font-medium text-zinc-800">{item.value}</p>
+                </div>
+              ))}
             </div>
           </div>
 

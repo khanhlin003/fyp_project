@@ -9,12 +9,19 @@ import {
   RecommendationResponse 
 } from '@/lib/api';
 import { 
-  ArrowLeft, TrendingUp, TrendingDown, Shield, Target, Zap,
+  TrendingUp, Shield, Target, Zap,
   Loader2, AlertCircle, ChevronRight, Star, Info, RefreshCw,
-  PieChart, DollarSign, Percent, BarChart3
+  DollarSign, Percent, BarChart3
 } from 'lucide-react';
 
 type RiskProfile = 'conservative' | 'balanced' | 'aggressive';
+
+type QuizIntent = {
+  timeline: string;
+  objective: string;
+  riskComfort: string;
+  cashNeed: string;
+};
 
 const profileConfig: Record<RiskProfile, {
   label: string;
@@ -64,14 +71,52 @@ function RecommendationsContent() {
   
   const [selectedProfile, setSelectedProfile] = useState<RiskProfile | null>(initialProfile);
   const [recommendations, setRecommendations] = useState<RecommendationResponse | null>(null);
+  const [quizIntent, setQuizIntent] = useState<QuizIntent | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const buildQuizIntent = (result: any): QuizIntent | null => {
+    if (!result?.breakdown || !Array.isArray(result.breakdown)) return null;
+
+    const pick = (qId: number) => result.breakdown.find((item: any) => item.question_id === qId)?.selected_option;
+    const timelineMap: Record<string, string> = {
+      A: 'Need in < 3 months',
+      B: 'Need in 3-12 months',
+      C: 'Need in 1-3 years',
+      D: 'Can keep for > 3 years',
+    };
+    const objectiveMap: Record<string, string> = {
+      A: 'Capital preservation',
+      B: 'Beat savings with low risk',
+      C: 'Balanced growth',
+      D: 'Maximum growth',
+    };
+    const riskMap: Record<string, string> = {
+      A: 'Very low drawdown tolerance',
+      B: 'Low drawdown tolerance',
+      C: 'Medium drawdown tolerance',
+      D: 'High drawdown tolerance',
+    };
+    const cashNeedMap: Record<string, string> = {
+      A: 'Critical cash',
+      B: 'Important but not urgent',
+      C: 'Dedicated investment capital',
+      D: 'Long-term growth capital',
+    };
+
+    return {
+      timeline: timelineMap[pick(1) || ''] || 'Not specified',
+      objective: objectiveMap[pick(2) || ''] || 'Not specified',
+      riskComfort: riskMap[pick(4) || ''] || 'Not specified',
+      cashNeed: cashNeedMap[pick(6) || ''] || 'Not specified',
+    };
+  };
 
   const fetchRecommendations = async (profile: RiskProfile) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getRecommendations(profile, 10);
+      const data = await getRecommendations(profile, 5);
       setRecommendations(data);
     } catch (err) {
       setError('Failed to load recommendations. Please try again.');
@@ -80,6 +125,25 @@ function RecommendationsContent() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    try {
+      const savedResult = localStorage.getItem('latestQuizResult');
+      if (!savedResult) return;
+      const parsed = JSON.parse(savedResult);
+      const intent = buildQuizIntent(parsed);
+      setQuizIntent(intent);
+
+      if (!initialProfile && parsed?.risk_profile) {
+        const lower = String(parsed.risk_profile).toLowerCase();
+        if (lower === 'conservative' || lower === 'balanced' || lower === 'aggressive') {
+          setSelectedProfile(lower);
+        }
+      }
+    } catch (storageError) {
+      console.error('Failed to hydrate quiz intent for recommendations:', storageError);
+    }
+  }, [initialProfile]);
 
   useEffect(() => {
     if (selectedProfile) {
@@ -98,18 +162,23 @@ function RecommendationsContent() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
         {/* Header */}
         <div className="mb-5">
-          <Link 
-            href="/"
-            className="inline-flex items-center text-sm text-[#3a5260] hover:text-[#0d1117] mb-3 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to Home
-          </Link>
           <h1 className="text-2xl font-bold text-[#0d1117]">Personalized Recommendations</h1>
           <p className="text-sm text-[#3a5260] mt-1.5">
-            Get ETF recommendations tailored to your risk profile
+            Top 5 ETFs selected by your quiz profile, objective, and risk fit
           </p>
         </div>
+
+        {quizIntent && (
+          <div className="mb-5 bg-white rounded-xl shadow-[0_1px_4px_rgba(85,178,201,0.06)] border-[1.5px] border-[#cae7ee] p-4">
+            <h2 className="text-sm font-semibold text-[#0d1117] mb-2">Your Intent Snapshot</h2>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-2 py-1 bg-[rgba(85,178,201,0.12)] text-[#3d96ad] rounded text-xs">Timeline: {quizIntent.timeline}</span>
+              <span className="px-2 py-1 bg-[#1cb08a12] text-[#1cb08a] rounded text-xs">Goal: {quizIntent.objective}</span>
+              <span className="px-2 py-1 bg-[#f0f8fa] text-[#3a5260] rounded text-xs">Risk: {quizIntent.riskComfort}</span>
+              <span className="px-2 py-1 bg-[#fff5e8] text-[#b5762d] rounded text-xs">Cash Need: {quizIntent.cashNeed}</span>
+            </div>
+          </div>
+        )}
 
         {/* Profile Selection */}
         <div className="mb-5">
@@ -221,7 +290,7 @@ function RecommendationsContent() {
                   </div>
                   <div className="text-center px-3 py-1.5 bg-[#f0f8fa] rounded-lg">
                     <p className="text-xl font-bold text-[#0d1117]">{recommendations.recommendations.length}</p>
-                    <p className="text-xs text-[#7a9fad]">Top Picks</p>
+                    <p className="text-xs text-[#7a9fad]">Top 5 Picks</p>
                   </div>
                 </div>
               </div>
@@ -252,7 +321,7 @@ function RecommendationsContent() {
             {/* Recommendation Cards */}
             <div className="space-y-3">
               {recommendations.recommendations.map((etf, index) => (
-                <RecommendationCard key={etf.ticker} etf={etf} rank={index + 1} />
+                <RecommendationCard key={etf.ticker} etf={etf} rank={index + 1} quizIntent={quizIntent} />
               ))}
             </div>
 
@@ -262,7 +331,7 @@ function RecommendationsContent() {
                 <div>
                   <h3 className="text-base font-semibold mb-1">Want to explore more?</h3>
                   <p className="text-[#cae7ee] text-xs sm:text-sm">
-                    Browse all {recommendations.total_matches} matching ETFs or discover the full catalog
+                    We curated the strongest 5 matches first. You can still browse all {recommendations.total_matches} matching ETFs.
                   </p>
                 </div>
                 <div className="flex space-x-3">
@@ -283,7 +352,7 @@ function RecommendationsContent() {
 }
 
 // Recommendation Card Component
-function RecommendationCard({ etf, rank }: { etf: RecommendedETF; rank: number }) {
+function RecommendationCard({ etf, rank, quizIntent }: { etf: RecommendedETF; rank: number; quizIntent: QuizIntent | null }) {
   const formatReturn = (value: string | null) => {
     if (!value) return 'N/A';
     const num = parseFloat(value.replace('%', ''));
@@ -304,6 +373,20 @@ function RecommendationCard({ etf, rank }: { etf: RecommendedETF; rank: number }
     if (rank === 3) return 'bg-orange-100 text-orange-700 border-orange-200';
     return 'bg-[#f0f8fa] text-[#7a9fad] border-[#cae7ee]';
   };
+
+  const reasonPoints = etf.recommendation_reason
+    .split(';')
+    .map((r) => r.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (quizIntent?.objective === 'Beat savings with low risk') {
+    reasonPoints.unshift('Aligned with your low-risk objective to outperform savings');
+  }
+
+  if (quizIntent?.timeline === 'Need in < 3 months' || quizIntent?.timeline === 'Need in 3-12 months') {
+    reasonPoints.push('Review short-term downside risk before allocating near-term cash');
+  }
 
   return (
     <Link href={`/etfs/${etf.ticker}`}>
@@ -392,10 +475,14 @@ function RecommendationCard({ etf, rank }: { etf: RecommendedETF; rank: number }
 
         {/* Recommendation Reason */}
         <div className="mt-3 pt-3 border-t border-[#cae7ee]">
-          <p className="text-xs sm:text-sm text-[#3a5260]">
-            <span className="font-medium text-[#3a5260]">Why this ETF: </span>
-            {etf.recommendation_reason}
+          <p className="text-xs sm:text-sm text-[#3a5260] mb-2">
+            <span className="font-medium text-[#3a5260]">Why this ETF fits you</span>
           </p>
+          <ul className="space-y-1">
+            {reasonPoints.slice(0, 3).map((point, idx) => (
+              <li key={idx} className="text-xs sm:text-sm text-[#3a5260]">• {point}</li>
+            ))}
+          </ul>
         </div>
       </div>
     </Link>

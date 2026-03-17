@@ -1,8 +1,31 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Home() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) {
+      return;
+    }
+
+    if (user?.risk_profile) {
+      router.replace('/recommendations');
+      return;
+    }
+
+    router.replace('/questionnaire');
+  }, [isAuthenticated, isLoading, router, user?.risk_profile]);
+
+  if (!isLoading && isAuthenticated) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen -mt-14">
       {/* Hero Section */}

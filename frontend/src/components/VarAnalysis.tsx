@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingDown, AlertTriangle, BarChart3, RefreshCw, Info } from 'lucide-react';
+import { AxiosError } from 'axios';
+import { AlertTriangle, BarChart3, RefreshCw } from 'lucide-react';
+
+type AnalysisTargetType = 'portfolio' | 'wallet' | 'etf';
 
 interface VarMethod {
   var_amount: number;
@@ -47,13 +50,24 @@ interface VarResult {
 }
 
 interface VarAnalysisProps {
-  onCalculate: (confidenceLevel: number, timeHorizon: number) => Promise<VarResult>;
+  onCalculate: (
+    confidenceLevel: number,
+    timeHorizon: number,
+    targetType: AnalysisTargetType,
+    walletId?: number,
+    ticker?: string
+  ) => Promise<VarResult>;
+  wallets: Array<{ id: number; name: string }>;
+  tickers: string[];
   compact?: boolean;
 }
 
-export default function VarAnalysis({ onCalculate, compact = false }: VarAnalysisProps) {
+export default function VarAnalysis({ onCalculate, wallets, tickers, compact = false }: VarAnalysisProps) {
   const [confidenceLevel, setConfidenceLevel] = useState<number>(0.95);
   const [timeHorizon, setTimeHorizon] = useState<number>(252);
+  const [targetType, setTargetType] = useState<AnalysisTargetType>('portfolio');
+  const [selectedWalletId, setSelectedWalletId] = useState<number | null>(null);
+  const [selectedTicker, setSelectedTicker] = useState<string>('');
   const [result, setResult] = useState<VarResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +75,31 @@ export default function VarAnalysis({ onCalculate, compact = false }: VarAnalysi
   const handleCalculate = async () => {
     setLoading(true);
     setError(null);
+
+    if (targetType === 'wallet' && !selectedWalletId) {
+      setError('Please select a wallet to analyze.');
+      setLoading(false);
+      return;
+    }
+
+    if (targetType === 'etf' && !selectedTicker) {
+      setError('Please select an ETF ticker to analyze.');
+      setLoading(false);
+      return;
+    }
     
     try {
-      const data = await onCalculate(confidenceLevel, timeHorizon);
+      const data = await onCalculate(
+        confidenceLevel,
+        timeHorizon,
+        targetType,
+        targetType === 'wallet' ? selectedWalletId || undefined : undefined,
+        targetType === 'etf' ? selectedTicker : undefined
+      );
       setResult(data);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to calculate VaR');
+    } catch (err: unknown) {
+      const axiosErr = err as AxiosError<{ detail?: string }>;
+      setError(axiosErr.response?.data?.detail || 'Failed to calculate VaR');
     } finally {
       setLoading(false);
     }
@@ -87,20 +120,60 @@ export default function VarAnalysis({ onCalculate, compact = false }: VarAnalysi
 
   return (
     <div className={`bg-white rounded-lg shadow-[0_4px_16px_rgba(85,178,201,0.12)] border-[1.5px] border-[#cae7ee] ${compact ? 'p-4' : 'p-6'}`}>
-      <div className={`flex items-center gap-2 ${compact ? 'mb-4' : 'mb-6'}`}>
-        <TrendingDown className="w-6 h-6 text-[#d44a4a]" />
-        <h2 className={`${compact ? 'text-xl' : 'text-2xl'} font-bold`}>Tail Risk Playground (VaR + CVaR)</h2>
-        <div className="group relative">
-          <Info className="w-4 h-4 text-[#7a9fad] cursor-help" />
-          <div className="invisible group-hover:visible absolute left-0 top-6 w-64 p-2 bg-[#0d1117] text-white text-xs rounded shadow-lg z-10">
-            VaR shows loss threshold, while CVaR shows average loss in worst-tail scenarios.
-          </div>
-        </div>
-      </div>
-
       <p className={`text-sm text-[#3a5260] ${compact ? 'mb-4' : 'mb-6'}`}>
         Use this section to estimate normal downside risk (VaR) and tail-event severity (CVaR).
       </p>
+
+      <div className={compact ? 'mb-4' : 'mb-6'}>
+        <label className="block text-sm font-medium text-[#3a5260] mb-2">Analyze Scope</label>
+        <select
+          value={targetType}
+          onChange={(e) => {
+            const nextTarget = e.target.value as AnalysisTargetType;
+            setTargetType(nextTarget);
+            if (nextTarget !== 'wallet') setSelectedWalletId(null);
+            if (nextTarget !== 'etf') setSelectedTicker('');
+          }}
+          className="w-full px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1] mb-3"
+          disabled={loading}
+        >
+          <option value="portfolio">Total Portfolio</option>
+          <option value="wallet">Each Wallet</option>
+          <option value="etf">Single ETF</option>
+        </select>
+
+        {targetType === 'wallet' && (
+          <select
+            value={selectedWalletId ?? ''}
+            onChange={(e) => setSelectedWalletId(e.target.value ? Number(e.target.value) : null)}
+            className="w-full px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1] mb-3"
+            disabled={loading}
+          >
+            <option value="">Select Wallet</option>
+            {wallets.map((wallet) => (
+              <option key={wallet.id} value={wallet.id}>
+                {wallet.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {targetType === 'etf' && (
+          <select
+            value={selectedTicker}
+            onChange={(e) => setSelectedTicker(e.target.value)}
+            className="w-full px-4 py-3 border border-[#cae7ee] rounded-lg focus:ring-2 focus:ring-[rgba(99,102,241,0.3)] focus:border-[#6366f1]"
+            disabled={loading}
+          >
+            <option value="">Select ETF</option>
+            {tickers.map((ticker) => (
+              <option key={ticker} value={ticker}>
+                {ticker}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       {/* Configuration */}
       <div className={`grid grid-cols-1 md:grid-cols-2 ${compact ? 'gap-4 mb-4' : 'gap-6 mb-6'}`}>

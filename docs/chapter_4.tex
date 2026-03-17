@@ -111,14 +111,7 @@ def update_ticker_prices(db, ticker, start_date=None, end_date=None):
     if df.empty:
         return 0
     for date, row in df.iterrows():
-        price = ETFPrice(
-            ticker=ticker, date=date.date(),
-            open=row['Open'], high=row['High'],
-            low=row['Low'], close=row['Close'], volume=row['Volume']
-        )
-        db.merge(price)  # Upsert to avoid duplicates
-    db.commit()
-    return len(df)
+        pass
 \end{lstlisting}
 
 \textbf{News Data Collection:}
@@ -152,15 +145,15 @@ The backend is implemented using FastAPI and follows a service-oriented, modular
 \begin{lstlisting}[caption={Backend Project Structure}]
 backend/
 +-- app/
-|   +-- main.py        # Application entry point and configuration
-|   +-- auth.py        # JWT authentication and user dependency
-|   +-- database.py    # Database connection using SQLAlchemy
-|   +-- models.py      # ORM models for Users, Portfolios, and ETFs
-|   +-- schemas.py     # Pydantic models for request/response validation
-|   +-- routes/        # API route definitions grouped by module
-|   +-- services/      # Business logic and complex calculations
-+-- scripts/           # Data ingestion and maintenance scripts
-+-- requirements.txt   # Python dependency manifest
+|   +-- main.py
+|   +-- auth.py
+|   +-- database.py
+|   +-- models.py
+|   +-- schemas.py
+|   +-- routes/
+|   +-- services/
++-- scripts/
++-- requirements.txt
 \end{lstlisting}
 
 \subsection{API Implementation}
@@ -172,26 +165,8 @@ The backend exposes a RESTful API organized into logical modules as defined in t
 The database schema is optimized for financial time-series data and rapid retrieval. Key tables include \texttt{etf\_prices} which stores over 5.7 million records, partitioned and indexed for performance.
 
 \begin{lstlisting}[language=SQL, caption={Core Tables Schema}]
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    hashed_password VARCHAR(255) NOT NULL,
-    risk_profile VARCHAR(20),
-    risk_score INTEGER,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE etfs (
-    ticker VARCHAR(10) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    category VARCHAR(100),
-    expense_ratio DECIMAL(5, 4),
-    aum BIGINT,
-    market VARCHAR(10) DEFAULT 'US'
-);
-
 CREATE TABLE etf_prices (
-    ticker VARCHAR(10) REFERENCES etfs(ticker),
+    ticker VARCHAR(10) NOT NULL,
     date DATE NOT NULL,
     open DECIMAL(10, 4),
     high DECIMAL(10, 4),
@@ -293,29 +268,22 @@ def calculate_recommendation_score(etf, profile):
     )
 \end{lstlisting}
 
-\subsection{Scenario Analysis, VaR and CVaR}
+\subsection{Scenario Analysis and VaR}
 
-The system allows users to stress-test portfolios against historical market crashes and hypothetical shocks, providing insights into tail risks.
+The system allows users to stress-test portfolios against historical market crashes and hypothetical shocks.
 
 \textbf{Historical Simulation:}
-Replays portfolio performance during significant market events, such as the COVID-19 crash (Feb 19 -- Mar 23, 2020), by filtering historical price data for specific windows.
+Replays portfolio performance during the COVID-19 crash (Feb 19 -- Mar 23, 2020) by filtering historical price data for that specific window.
 
-\textbf{Value at Risk (VaR) and Conditional VaR (CVaR):}
-The system calculates the 95\% Historical VaR to estimate the maximum expected loss with 95\% confidence. Additionally, it computes Conditional Value at Risk (CVaR), or Expected Shortfall, which measures the average loss assuming the VaR threshold is breached, providing a more comprehensive view of extreme downside risk.
+\textbf{Value at Risk (VaR):}
+Calculates the 95\% Historical VaR, representing the maximum expected loss with 95\% confidence over a single day.
 
-\begin{lstlisting}[style=pythonstyle, caption={VaR and CVaR Calculation}]
-def calculate_risk_metrics(returns: pd.Series, confidence: float = 0.95):
-    """Calculates Historical VaR and Expected Shortfall (CVaR)"""
+\begin{lstlisting}[style=pythonstyle, caption={Historical VaR Calculation}]
+def calculate_historical_var(returns: pd.Series, confidence: float = 0.95) -> float:
+    """Returns the 5th percentile of daily returns"""
     if len(returns) < 252:
-        return 0.0, 0.0
-        
-    # VaR: The (1-confidence) percentile cutoff
-    var_threshold = np.percentile(returns, (1 - confidence) * 100)
-    
-    # CVaR: Average of all returns worse than the VaR threshold
-    cvar = returns[returns <= var_threshold].mean()
-    
-    return var_threshold, cvar
+        return 0.0
+    return np.percentile(returns, (1 - confidence) * 100)
 \end{lstlisting}
 
 \subsection{AI Chatbot Service}
@@ -356,7 +324,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 The frontend is developed using Next.js 14 with a component-driven architecture and responsive design principles.
 \begin{lstlisting}[caption={Frontend Project Structure}]
-frontend/
+frontend/src/
 +-- src/
 |   +-- app/                      # Next.js App Router pages
 |   |   +-- page.tsx              # Landing page (/)
@@ -409,10 +377,12 @@ Developing a data-intensive financial platform presented several significant tec
 
 \subsection{API Rate Limiting and Data Freshness}
 \textbf{Challenge:} The Alpha Vantage API (free tier) restricts usage to 5 calls per minute and 500 per day. Updating news for 2,000+ ETFs daily was impossible under these constraints.
-\textbf{Solution:} We implemented a prioritization queue using \texttt{APScheduler}. The system updates the top 100 ETFs by AUM daily (requiring 100 calls spread over 20 minutes) and updates other ETFs on-demand when a user views their details page. We also utilized caching strategies to prevent redundant API calls for the same ticker within a 24-hour window.
+
+\textbf{Solution:} I implemented a prioritization queue using \texttt{APScheduler}. The system updates the top 100 ETFs by AUM daily (requiring 100 calls spread over 20 minutes) and updates other ETFs on-demand when a user views their details page. I also utilized caching strategies to prevent redundant API calls for the same ticker within a 24-hour window.
 
 \subsection{Data Consistency and Gap Filling}
 \textbf{Challenge:} Financial data from newly listed ETFs often contains null values or non-contiguous dates, breaking chart rendering and metric calculations (e.g., volatility requires continuous returns).
+
 \textbf{Solution:} A robust preprocessing pipeline was built using Pandas. Missing prices on weekends/holidays are handled via forward-filling (\texttt{ffill()}), ensuring no look-ahead bias. For metrics requiring strict window sizes (e.g., 252-day volatility), ETFs with insufficient history are flagged and excluded from certain risk analytics to prevent skewed results.
 
 
@@ -425,29 +395,6 @@ The platform is deployed using a cloud-native architecture with clearly separate
     \item {Frontend:} The Next.js application is deployed on Vercel with automatic CI/CD from GitHub.
     \item {Database:} PostgreSQL on Supabase is configured with connection pooling, indexing, row-level security, and automated backups.
 \end{itemize}
-
-\section{Environment Configuration}
-
-Sensitive credentials and environment-specific settings are managed through environment variables, ensuring security and portability across development, staging, and production environments.
-
-\begin{table}[H]
-\centering
-\begin{tabular}{lll}
-\toprule
-\textbf{Variable} & \textbf{Purpose} & \textbf{Example} \\
-\midrule
-DATABASE\_URL & PostgreSQL connection string & postgresql://user:pass@host/db \\
-SECRET\_KEY & JWT signing key & (256-bit random string) \\
-OPENAI\_API\_KEY & GPT-4o API authentication & sk-... \\
-ALPHA\_VANTAGE\_KEY & News sentiment API key & (API key) \\
-CORS\_ORIGINS & Allowed frontend origins & https://myapp.vercel.app \\
-\bottomrule
-\end{tabular}
-\caption{Environment Variables}
-\label{tab:env_vars}
-\end{table}
-
-All secrets are stored securely in the deployment platform's environment configuration (Render for backend, Vercel for frontend) and are never committed to version control.
 
 \section{Testing and Evaluation}
 
@@ -492,9 +439,6 @@ Lighthouse Score & Performance & $>$ 80 & 88 \\
 \caption{Performance Benchmarks}
 \label{tab:performance}
 \end{table}
-
-\subsection{User Acceptance Testing (UAT)}
-A UAT session with 8 retail investors yielded a 100\% task completion rate. Users rated the "Ease of Navigation" at 4.5/5 and the "Usefulness of Recommendations" at 4.3/5, validating the system's core value proposition.
 
 
 
