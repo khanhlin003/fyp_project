@@ -19,6 +19,7 @@ async def list_etfs(
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     category: Optional[str] = Query(None, description="Filter by category"),
     asset_class: Optional[str] = Query(None, description="Filter by asset class"),
+    etf_type: Optional[str] = Query(None, description="Filter by ETF type (e.g., ACTIVE, PASSIVE)"),
     region: Optional[str] = Query(None, description="Filter by region"),
     search: Optional[str] = Query(None, description="Search by ticker or name"),
 ):
@@ -29,6 +30,7 @@ async def list_etfs(
     - **page_size**: Number of items per page (default: 20, max: 100)
     - **category**: Filter by category (e.g., "Large Cap Blend")
     - **asset_class**: Filter by asset class (e.g., "Equity")
+    - **etf_type**: Filter by ETF type (e.g., "ACTIVE", "PASSIVE")
     - **region**: Filter by region (e.g., "North America")
     - **search**: Search by ticker or ETF name
     """
@@ -43,6 +45,9 @@ async def list_etfs(
         
         if asset_class:
             query = query.where(ETF.asset_class == asset_class)
+
+        if etf_type:
+            query = query.where(func.lower(ETF.asset_class_size) == etf_type.lower())
         
         if region:
             query = query.where(
@@ -72,12 +77,46 @@ async def list_etfs(
         # Execute query
         result = session.execute(query)
         etfs = result.scalars().all()
+
+        latest_by_ticker = {}
+        if etfs:
+            tickers = [etf.ticker for etf in etfs]
+            latest_price_subquery = (
+                select(
+                    ETFPrice.ticker.label("ticker"),
+                    ETFPrice.close.label("latest_price"),
+                    ETFPrice.volume.label("latest_volume"),
+                    func.row_number().over(
+                        partition_by=ETFPrice.ticker,
+                        order_by=ETFPrice.date.desc(),
+                    ).label("rn"),
+                )
+                .where(ETFPrice.ticker.in_(tickers))
+                .subquery()
+            )
+
+            latest_rows = session.execute(
+                select(
+                    latest_price_subquery.c.ticker,
+                    latest_price_subquery.c.latest_price,
+                    latest_price_subquery.c.latest_volume,
+                ).where(latest_price_subquery.c.rn == 1)
+            ).all()
+            latest_by_ticker = {row.ticker: row for row in latest_rows}
+
+        etf_items = []
+        for etf in etfs:
+            item = ETFBase.model_validate(etf, from_attributes=True)
+            latest = latest_by_ticker.get(etf.ticker)
+            item.latest_price = float(latest.latest_price) if latest and latest.latest_price is not None else None
+            item.latest_volume = int(latest.latest_volume) if latest and latest.latest_volume is not None else None
+            etf_items.append(item)
         
         return ETFList(
             total=total,
             page=page,
             page_size=page_size,
-            etfs=[ETFBase.model_validate(etf, from_attributes=True) for etf in etfs]
+            etfs=etf_items
         )
     
     finally:
@@ -164,7 +203,7 @@ async def get_filter_options():
     """
     Get all available filter options for ETF discovery
     
-    Returns unique values for categories, asset classes, and regions
+    Returns unique values for categories, asset classes, ETF types, and regions
     """
     session = SessionLocal()
     
@@ -176,6 +215,15 @@ async def get_filter_options():
         # Get unique asset classes
         asset_classes_query = select(ETF.asset_class).distinct().where(ETF.asset_class.isnot(None))
         asset_classes = session.execute(asset_classes_query).scalars().all()
+
+        # ETF type values are stored in asset_class_size for this dataset
+        etf_types_query = (
+            select(ETF.asset_class_size)
+            .distinct()
+            .where(ETF.asset_class_size.isnot(None))
+            .where(func.lower(ETF.asset_class_size).in_(["active", "passive"]))
+        )
+        etf_types = session.execute(etf_types_query).scalars().all()
         
         # Get unique regions
         regions_query = select(ETF.general_region).distinct().where(ETF.general_region.isnot(None))
@@ -184,6 +232,7 @@ async def get_filter_options():
         return {
             "categories": sorted([c for c in categories if c]),
             "asset_classes": sorted([a for a in asset_classes if a]),
+            "etf_types": sorted([t.upper() for t in etf_types if t]),
             "regions": sorted([r for r in regions if r])
         }
     

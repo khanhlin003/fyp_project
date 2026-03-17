@@ -60,6 +60,7 @@ async def root():
         "endpoints": {
             "docs": "/docs",
             "auth": "/auth/signup, /auth/login, /auth/me",
+            "wallets": "/wallets (requires auth)",
             "etfs": "/etfs",
             "prices": "/etfs/{ticker}/prices",
             "metrics": "/etfs/{ticker}/metrics, /etfs/metrics/batch, /etfs/metrics/compare",
@@ -80,9 +81,10 @@ async def health_check():
 
 # Import and register routes
 
-from app.routes import etfs, prices, macro, quiz, recommendations, auth, portfolio, chatbot, metrics, news, scenarios
+from app.routes import etfs, prices, macro, quiz, recommendations, auth, portfolio, chatbot, metrics, news, scenarios, wallets
 
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(wallets.router, prefix="/wallets", tags=["Wallets"])
 app.include_router(etfs.router, prefix="/etfs", tags=["ETFs"])
 app.include_router(prices.router, prefix="/etfs", tags=["Prices"])
 app.include_router(metrics.router, prefix="/etfs", tags=["Metrics"])

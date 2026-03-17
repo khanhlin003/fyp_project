@@ -9,7 +9,7 @@ from typing import List, Optional
 from datetime import date, datetime
 
 from app.database import SessionLocal
-from app.models import User, Portfolio, ETF, ETFPrice
+from app.models import User, Portfolio, ETF, ETFPrice, Wallet, WalletHolding
 from app.auth import get_current_user
 
 router = APIRouter()
@@ -29,17 +29,21 @@ class AddPortfolioItem(BaseModel):
     quantity: float
     purchase_price: Optional[float] = None
     purchase_date: Optional[date] = None
+    wallet_id: Optional[int] = None
 
 
 class UpdatePortfolioItem(BaseModel):
     quantity: Optional[float] = None
     purchase_price: Optional[float] = None
     purchase_date: Optional[date] = None
+    wallet_id: Optional[int] = None
 
 
 class PortfolioItemResponse(BaseModel):
     id: int
     ticker: str
+    wallet_id: Optional[int] = None
+    wallet_name: Optional[str] = None
     quantity: float
     purchase_price: Optional[float]
     purchase_date: Optional[date]
@@ -68,6 +72,69 @@ class PortfolioTimeseriesPoint(BaseModel):
     unrealized_return_percent: float
 
 
+def _get_wallet_map_by_ticker(db: Session, user_id: int) -> dict[str, dict[str, Optional[str]]]:
+    """Return latest wallet assignment by ticker for a user."""
+    rows = db.query(WalletHolding, Wallet).join(
+        Wallet, Wallet.id == WalletHolding.wallet_id
+    ).filter(
+        Wallet.user_id == user_id
+    ).all()
+
+    assignments: dict[str, dict[str, Optional[str]]] = {}
+    for holding, wallet in rows:
+        current = assignments.get(holding.ticker)
+        if current is None or (holding.updated_at and current.get("updated_at") and holding.updated_at > current["updated_at"]) or current is None:
+            assignments[holding.ticker] = {
+                "wallet_id": wallet.id,
+                "wallet_name": wallet.name,
+                "updated_at": holding.updated_at,
+            }
+
+    return assignments
+
+
+def _validate_user_wallet(db: Session, user_id: int, wallet_id: int) -> Wallet:
+    wallet = db.query(Wallet).filter(
+        Wallet.id == wallet_id,
+        Wallet.user_id == user_id,
+        Wallet.is_active == 1,
+    ).first()
+    if not wallet:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wallet not found",
+        )
+    return wallet
+
+
+def _sync_wallet_assignment(
+    db: Session,
+    user_id: int,
+    ticker: str,
+    quantity: float,
+    avg_cost: Optional[float],
+    wallet_id: Optional[int],
+) -> None:
+    user_wallet_ids = [w.id for w in db.query(Wallet).filter(Wallet.user_id == user_id).all()]
+    if not user_wallet_ids:
+        return
+
+    existing_rows = db.query(WalletHolding).filter(
+        WalletHolding.wallet_id.in_(user_wallet_ids),
+        WalletHolding.ticker == ticker,
+    ).all()
+    for row in existing_rows:
+        db.delete(row)
+
+    if wallet_id is not None:
+        db.add(WalletHolding(
+            wallet_id=wallet_id,
+            ticker=ticker,
+            quantity=quantity,
+            avg_cost=avg_cost,
+        ))
+
+
 # Routes
 @router.get("", response_model=PortfolioSummary)
 async def get_portfolio(
@@ -80,6 +147,7 @@ async def get_portfolio(
     portfolio_items = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).all()
     
     holdings = []
+    wallet_map = _get_wallet_map_by_ticker(db, current_user.id)
     total_value = 0
     total_cost = 0
     
@@ -104,9 +172,13 @@ async def get_portfolio(
         if cost_basis > 0:
             total_cost += cost_basis
         
+        wallet_info = wallet_map.get(item.ticker, {})
+
         holdings.append(PortfolioItemResponse(
             id=item.id,
             ticker=item.ticker,
+            wallet_id=wallet_info.get("wallet_id"),
+            wallet_name=wallet_info.get("wallet_name"),
             quantity=item.quantity,
             purchase_price=item.purchase_price,
             purchase_date=item.purchase_date,
@@ -240,6 +312,10 @@ async def add_to_portfolio(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Quantity must be greater than 0"
         )
+
+    selected_wallet = None
+    if item.wallet_id is not None:
+        selected_wallet = _validate_user_wallet(db, current_user.id, item.wallet_id)
     
     # Get current price if purchase_price not provided
     purchase_price = item.purchase_price
@@ -259,6 +335,15 @@ async def add_to_portfolio(
     )
     
     db.add(portfolio_item)
+    if selected_wallet is not None:
+        _sync_wallet_assignment(
+            db=db,
+            user_id=current_user.id,
+            ticker=item.ticker.upper(),
+            quantity=item.quantity,
+            avg_cost=purchase_price,
+            wallet_id=selected_wallet.id,
+        )
     db.commit()
     db.refresh(portfolio_item)
     
@@ -272,10 +357,15 @@ async def add_to_portfolio(
     cost_basis = (portfolio_item.purchase_price * portfolio_item.quantity) if portfolio_item.purchase_price else 0
     gain_loss = (current_value - cost_basis) if (current_value is not None and cost_basis > 0) else None
     gain_loss_percent = (gain_loss / cost_basis * 100) if (gain_loss is not None and cost_basis > 0) else None
+    wallet_info = _get_wallet_map_by_ticker(db, current_user.id).get(portfolio_item.ticker, {})
+
+    wallet_info = _get_wallet_map_by_ticker(db, current_user.id).get(portfolio_item.ticker, {})
     
     return PortfolioItemResponse(
         id=portfolio_item.id,
         ticker=portfolio_item.ticker,
+        wallet_id=wallet_info.get("wallet_id"),
+        wallet_name=wallet_info.get("wallet_name"),
         quantity=portfolio_item.quantity,
         purchase_price=portfolio_item.purchase_price,
         purchase_date=portfolio_item.purchase_date,
@@ -321,6 +411,35 @@ async def update_portfolio_item(
     
     if item.purchase_date is not None:
         portfolio_item.purchase_date = item.purchase_date
+
+    selected_wallet = None
+    if item.wallet_id is not None:
+        selected_wallet = _validate_user_wallet(db, current_user.id, item.wallet_id)
+
+    final_quantity = portfolio_item.quantity
+    final_avg_cost = portfolio_item.purchase_price
+
+    if selected_wallet is not None:
+        _sync_wallet_assignment(
+            db=db,
+            user_id=current_user.id,
+            ticker=portfolio_item.ticker,
+            quantity=final_quantity,
+            avg_cost=final_avg_cost,
+            wallet_id=selected_wallet.id,
+        )
+    else:
+        wallet_map = _get_wallet_map_by_ticker(db, current_user.id)
+        existing_wallet_id = wallet_map.get(portfolio_item.ticker, {}).get("wallet_id")
+        if existing_wallet_id is not None:
+            _sync_wallet_assignment(
+                db=db,
+                user_id=current_user.id,
+                ticker=portfolio_item.ticker,
+                quantity=final_quantity,
+                avg_cost=final_avg_cost,
+                wallet_id=int(existing_wallet_id),
+            )
     
     db.commit()
     db.refresh(portfolio_item)
@@ -340,6 +459,8 @@ async def update_portfolio_item(
     return PortfolioItemResponse(
         id=portfolio_item.id,
         ticker=portfolio_item.ticker,
+        wallet_id=wallet_info.get("wallet_id"),
+        wallet_name=wallet_info.get("wallet_name"),
         quantity=portfolio_item.quantity,
         purchase_price=portfolio_item.purchase_price,
         purchase_date=portfolio_item.purchase_date,
@@ -372,6 +493,14 @@ async def remove_from_portfolio(
         )
     
     db.delete(portfolio_item)
+
+    user_wallet_ids = [w.id for w in db.query(Wallet).filter(Wallet.user_id == current_user.id).all()]
+    if user_wallet_ids:
+        db.query(WalletHolding).filter(
+            WalletHolding.wallet_id.in_(user_wallet_ids),
+            WalletHolding.ticker == ticker.upper(),
+        ).delete(synchronize_session=False)
+
     db.commit()
     
     return None

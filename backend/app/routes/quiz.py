@@ -2,11 +2,16 @@
 Quiz & Risk Profile Endpoints
 Handles quiz questions, submission, and risk profile calculation
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, List, Optional
+from sqlalchemy.orm import Session
 import json
 import os
+
+from app.auth import get_current_user_optional
+from app.database import get_db
+from app.models import User
 
 router = APIRouter()
 
@@ -89,10 +94,8 @@ def load_quiz_data():
 
 def calculate_score(answers: Dict[str, str], quiz_data: dict) -> tuple:
     """
-    Calculate quiz score with refined logic:
-    - Q2 (multi-select): Cap at 50 points
-    - Q4, Q12, Q14: Points already doubled in JSON
-    - Q13: Reversed scoring (FOMO = high points)
+    Calculate quiz score by summing points from selected options.
+    The quiz schema controls weighting through per-option points.
     """
     questions = quiz_data["quiz"]["questions"]
     total_score = 0
@@ -120,11 +123,6 @@ def calculate_score(answers: Dict[str, str], quiz_data: dict) -> tuple:
         
         if selected_option:
             points = selected_option["points"]
-            
-            # Q2 special handling: cap at 50 for multi-select
-            # (In case frontend sends multiple selections as comma-separated)
-            if q_id == 2 and "scoring_note" in question:
-                points = min(points, 50)
             
             total_score += points
             
@@ -169,7 +167,11 @@ async def get_quiz_questions():
 
 
 @router.post("/submit", response_model=QuizResult)
-async def submit_quiz(quiz_answer: QuizAnswer):
+async def submit_quiz(
+    quiz_answer: QuizAnswer,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
     """
     Submit quiz answers and get risk profile.
     
@@ -187,14 +189,13 @@ async def submit_quiz(quiz_answer: QuizAnswer):
     ```
     
     Scoring logic:
-    - Q2 (multi-select): Capped at 50 points max
-    - Q4, Q12, Q14 (emotional): Points doubled for better risk assessment
-    - Q13 (FOMO): Reversed - impulsive behavior = high points (aggressive)
+    - Points are summed across answered questions
+    - Risk profile thresholds are loaded from quiz configuration
     
     Risk Profiles:
-    - Conservative: 0-425 points
-    - Balanced: 426-850 points  
-    - Aggressive: 851-1275 points
+    - Conservative: Lower total score range
+    - Balanced: Middle total score range
+    - Aggressive: Higher total score range
     """
     quiz_data = load_quiz_data()
     
@@ -207,6 +208,11 @@ async def submit_quiz(quiz_answer: QuizAnswer):
     
     # Get risk profile
     profile_name, profile_description = get_risk_profile(total_score, quiz_data)
+
+    # Save the latest risk profile for authenticated users
+    if current_user is not None:
+        current_user.risk_profile = profile_name.lower()
+        db.commit()
     
     # Calculate max possible score
     max_score = quiz_data["quiz"]["scoring"]["max_score"]

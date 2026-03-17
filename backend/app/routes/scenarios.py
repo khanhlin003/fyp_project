@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from ..database import get_db
 from ..auth import get_current_user
-from ..models import User, Portfolio
+from ..models import User, Portfolio, Wallet, WalletHolding, ETFPrice
 from ..services.scenario_service import (
     analyze_covid_scenario,
     analyze_simple_stress_test,
@@ -29,6 +29,9 @@ class HoldingInput(BaseModel):
 
 class ScenarioRequest(BaseModel):
     scenario_id: str = Field(..., description="Scenario ID (covid-crash, stress-10, etc.)")
+    target_type: str = Field("portfolio", description="Analysis target: portfolio, wallet, or etf")
+    wallet_id: Optional[int] = Field(None, description="Wallet ID when target_type is wallet")
+    ticker: Optional[str] = Field(None, description="Ticker when target_type is etf")
     holdings: Optional[List[HoldingInput]] = Field(None, description="Custom holdings (optional, uses portfolio if not provided)")
 
 
@@ -39,6 +42,134 @@ class ScenarioResponse(BaseModel):
     portfolio_summary: dict
     holdings: List[dict]
     insights: Optional[dict] = None
+
+
+def _latest_price(db: Session, ticker: str) -> Optional[float]:
+    row = db.query(ETFPrice).filter(ETFPrice.ticker == ticker).order_by(ETFPrice.date.desc()).first()
+    if not row or row.close is None:
+        return None
+    return float(row.close)
+
+
+def _resolve_holdings_for_target(
+    db: Session,
+    current_user: User,
+    target_type: str,
+    wallet_id: Optional[int] = None,
+    ticker: Optional[str] = None,
+) -> List[dict]:
+    normalized_target = (target_type or "portfolio").lower()
+
+    if normalized_target == "portfolio":
+        portfolio_items = db.query(Portfolio).filter(Portfolio.user_id == current_user.id).all()
+        if not portfolio_items:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Portfolio is empty. Add holdings first."
+            )
+
+        return [
+            {
+                "ticker": item.ticker,
+                "quantity": item.quantity,
+                "purchase_price": item.purchase_price or _latest_price(db, item.ticker) or 1.0,
+            }
+            for item in portfolio_items
+        ]
+
+    if normalized_target == "wallet":
+        if wallet_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="wallet_id is required when target_type is wallet"
+            )
+
+        wallet = db.query(Wallet).filter(
+            Wallet.id == wallet_id,
+            Wallet.user_id == current_user.id,
+            Wallet.is_active == 1,
+        ).first()
+        if not wallet:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Wallet not found"
+            )
+
+        wallet_holdings = db.query(WalletHolding).filter(WalletHolding.wallet_id == wallet_id).all()
+        if not wallet_holdings:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected wallet has no holdings"
+            )
+
+        return [
+            {
+                "ticker": item.ticker,
+                "quantity": item.quantity,
+                "purchase_price": item.avg_cost or _latest_price(db, item.ticker) or 1.0,
+            }
+            for item in wallet_holdings
+        ]
+
+    if normalized_target == "etf":
+        if not ticker:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="ticker is required when target_type is etf"
+            )
+
+        normalized_ticker = ticker.upper()
+        portfolio_item = db.query(Portfolio).filter(
+            Portfolio.user_id == current_user.id,
+            Portfolio.ticker == normalized_ticker,
+        ).first()
+
+        if portfolio_item:
+            return [{
+                "ticker": portfolio_item.ticker,
+                "quantity": portfolio_item.quantity,
+                "purchase_price": portfolio_item.purchase_price or _latest_price(db, portfolio_item.ticker) or 1.0,
+            }]
+
+        wallet_rows = db.query(WalletHolding).join(
+            Wallet, Wallet.id == WalletHolding.wallet_id
+        ).filter(
+            Wallet.user_id == current_user.id,
+            WalletHolding.ticker == normalized_ticker,
+        ).all()
+
+        if wallet_rows:
+            total_qty = sum(float(row.quantity or 0) for row in wallet_rows)
+            if total_qty <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Selected ETF position has zero quantity"
+                )
+            weighted_cost = sum((float(row.avg_cost or 0) * float(row.quantity or 0)) for row in wallet_rows)
+            avg_cost = (weighted_cost / total_qty) if weighted_cost > 0 else None
+            return [{
+                "ticker": normalized_ticker,
+                "quantity": total_qty,
+                "purchase_price": avg_cost or _latest_price(db, normalized_ticker) or 1.0,
+            }]
+
+        latest = _latest_price(db, normalized_ticker)
+        if latest is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No price data found for ticker '{normalized_ticker}'"
+            )
+
+        return [{
+            "ticker": normalized_ticker,
+            "quantity": 1.0,
+            "purchase_price": latest,
+        }]
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="target_type must be one of: portfolio, wallet, etf"
+    )
 
 
 @router.get("/available")
@@ -85,25 +216,13 @@ def analyze_scenario(
     if request.holdings:
         holdings = [h.dict() for h in request.holdings]
     else:
-        # Fetch user's portfolio from database
-        portfolio_items = db.query(Portfolio).filter(
-            Portfolio.user_id == current_user.id
-        ).all()
-        
-        if not portfolio_items:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No holdings provided and portfolio is empty"
-            )
-        
-        holdings = [
-            {
-                "ticker": item.ticker,
-                "quantity": item.quantity,
-                "purchase_price": item.purchase_price
-            }
-            for item in portfolio_items
-        ]
+        holdings = _resolve_holdings_for_target(
+            db=db,
+            current_user=current_user,
+            target_type=request.target_type,
+            wallet_id=request.wallet_id,
+            ticker=request.ticker,
+        )
     
     # Route to appropriate scenario handler
     scenario_id = request.scenario_id.lower()
@@ -179,6 +298,9 @@ def analyze_portfolio_covid(
 def calculate_portfolio_var(
     confidence_level: float = 0.95,
     time_horizon_days: int = 252,
+    target_type: str = "portfolio",
+    wallet_id: Optional[int] = None,
+    ticker: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -237,25 +359,13 @@ def calculate_portfolio_var(
             detail="time_horizon_days must be between 30 and 1000"
         )
     
-    # Fetch user's portfolio
-    portfolio_items = db.query(Portfolio).filter(
-        Portfolio.user_id == current_user.id
-    ).all()
-    
-    if not portfolio_items:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Portfolio is empty. Add holdings first."
-        )
-    
-    holdings = [
-        {
-            "ticker": item.ticker,
-            "quantity": item.quantity,
-            "purchase_price": item.purchase_price
-        }
-        for item in portfolio_items
-    ]
+    holdings = _resolve_holdings_for_target(
+        db=db,
+        current_user=current_user,
+        target_type=target_type,
+        wallet_id=wallet_id,
+        ticker=ticker,
+    )
     
     result = calculate_var(
         db, 

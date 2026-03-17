@@ -19,6 +19,8 @@ class ETFBase(BaseModel):
     ytd_return: Optional[str] = Field(None, validation_alias="return_ytd")
     beta: Optional[str] = None
     annual_dividend_yield: Optional[str] = None
+    latest_price: Optional[float] = None
+    latest_volume: Optional[int] = None
     
     class Config:
         from_attributes = True
@@ -105,6 +107,7 @@ class MacroIndicator(BaseModel):
 class ETFFilters(BaseModel):
     category: Optional[str] = None
     asset_class: Optional[str] = None
+    etf_type: Optional[str] = None
     region: Optional[str] = None
     min_aum: Optional[float] = None
     max_expense_ratio: Optional[float] = None

@@ -141,6 +141,49 @@ class Portfolio(Base):
     purchase_price = Column(Float)
 
 
+class Wallet(Base):
+    __tablename__ = "wallets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    purpose = Column(String, nullable=False, default="custom")
+    base_currency = Column(String, nullable=False, default="USD")
+    is_active = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WalletProfile(Base):
+    __tablename__ = "wallet_profiles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wallet_id = Column(Integer, ForeignKey("wallets.id"), nullable=False, unique=True, index=True)
+    risk_profile = Column(String, nullable=False, default="balanced")
+    horizon_months = Column(Integer, nullable=True)
+    objective = Column(String, nullable=False, default="balanced_growth")
+    target_return_min = Column(Float, nullable=True)
+    target_return_max = Column(Float, nullable=True)
+    max_drawdown_pct = Column(Float, nullable=True)
+    liquidity_need = Column(String, nullable=False, default="medium")
+    experience_level = Column(String, nullable=False, default="beginner")
+    source = Column(String, nullable=False, default="manual")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WalletHolding(Base):
+    __tablename__ = "wallet_holdings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wallet_id = Column(Integer, ForeignKey("wallets.id"), nullable=False, index=True)
+    ticker = Column(String, ForeignKey("etfs.ticker"), nullable=False, index=True)
+    quantity = Column(Float, nullable=False, default=0)
+    avg_cost = Column(Float, nullable=True)
+    added_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class News(Base):
     """
     News articles from Alpha Vantage NEWS_SENTIMENT API.
