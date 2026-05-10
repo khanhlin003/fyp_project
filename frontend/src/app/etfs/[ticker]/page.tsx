@@ -965,18 +965,18 @@ function Chatbot({ etf, onClose }: { etf: ETFDetail; onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 p-4 flex items-center justify-center">
-      <div className="w-full max-w-2xl max-h-[85vh] overflow-hidden bg-white rounded-2xl shadow-2xl border border-[#e5e7eb] p-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold text-[#0d1117]">ETF AI Chatbot</h2>
+      <div className="w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden bg-white rounded-2xl shadow-2xl border border-[#e5e7eb] p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-[#0d1117]">ETF AI Chatbot</h2>
         <button
           onClick={onClose}
           className="p-1.5 rounded-md text-[#71717a] hover:bg-[#f4f4f5]"
           aria-label="Close chatbot"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
       </div>
-      <div className="h-48 overflow-y-auto border border-[#e5e7eb] rounded-lg p-2 mb-2 bg-[#f8fafc]">
+      <div className="flex-1 overflow-y-auto border border-[#e5e7eb] rounded-lg p-4 mb-4 bg-[#f8fafc]">
         {messages.length === 0 && (
           <div className="text-[#71717a] text-sm text-center mt-12">Ask anything about this ETF!</div>
         )}
@@ -993,10 +993,10 @@ function Chatbot({ etf, onClose }: { etf: ETFDetail; onClose: () => void }) {
           </div>
         )}
       </div>
-      <form onSubmit={handleSend} className="flex gap-2">
+      <form onSubmit={handleSend} className="flex gap-2 mt-2">
         <input
           type="text"
-          className="flex-1 border border-[#e5e7eb] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(14,165,233,0.35)]"
+          className="flex-1 border border-[#e5e7eb] rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[rgba(14,165,233,0.35)]"
           placeholder="Ask a question about this ETF..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -1004,7 +1004,7 @@ function Chatbot({ etf, onClose }: { etf: ETFDetail; onClose: () => void }) {
         />
         <button
           type="submit"
-          className="px-4 py-2 bg-[#6366f1] text-white rounded-lg font-medium hover:bg-[#4f46e5] disabled:opacity-50"
+          className="px-5 py-3 bg-[#6366f1] text-white rounded-lg font-medium hover:bg-[#4f46e5] disabled:opacity-50"
           disabled={loading || !input.trim()}
         >
           Send
