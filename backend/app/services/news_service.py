@@ -73,7 +73,7 @@ def rate_limiter(func):
 
 @rate_limiter
 def fetch_news_from_alpha_vantage(
-    tickers: str,
+    tickers: Optional[str] = None,
     limit: int = 50,
     topics: Optional[str] = None,
     time_from: Optional[str] = None,
@@ -83,7 +83,7 @@ def fetch_news_from_alpha_vantage(
     Fetch news from Alpha Vantage NEWS_SENTIMENT API
     
     Args:
-        tickers: Comma-separated tickers (e.g., "SPY,QQQ,VTI")
+        tickers: Comma-separated tickers (e.g., "SPY,QQQ,VTI"). Optional — omit for topic-only fetch.
         limit: Number of articles (default 50, max 1000)
         topics: Optional topics filter (e.g., "financial_markets,economy_macro")
         time_from: Optional start time in YYYYMMDDTHHMM format
@@ -95,11 +95,12 @@ def fetch_news_from_alpha_vantage(
     try:
         params = {
             "function": "NEWS_SENTIMENT",
-            "tickers": tickers,
             "apikey": ALPHA_VANTAGE_API_KEY,
             "limit": limit,
             "sort": sort
         }
+        if tickers:
+            params["tickers"] = tickers
         
         if topics:
             params["topics"] = topics
@@ -205,11 +206,17 @@ def parse_alpha_vantage_response(data: Dict) -> List[Dict]:
     return articles
 
 
-def store_news_in_db(articles: List[Dict], db: Session) -> Tuple[int, int]:
+def store_news_in_db(articles: List[Dict], db: Session, force_ticker: Optional[str] = None) -> Tuple[int, int]:
     """
     Store parsed articles and ticker sentiments in database
     Handles duplicates by URL
-    
+
+    Args:
+        force_ticker: If provided, adds a synthetic NewsTicker row for this ticker
+                      when the article's ticker_sentiment list doesn't already include it.
+                      Used for topic-based fallback fetches so the article is discoverable
+                      under the ETF's ticker even if Alpha Vantage didn't tag it directly.
+
     Returns:
         Tuple of (new_articles_count, updated_articles_count)
     """
@@ -255,6 +262,7 @@ def store_news_in_db(articles: List[Dict], db: Session) -> Tuple[int, int]:
                 new_count += 1
             
             # Add ticker sentiments
+            tagged_tickers = set()
             for ts_data in article_data["ticker_sentiments"]:
                 ticker_obj = NewsTicker(
                     news_id=news_obj.id,
@@ -264,7 +272,20 @@ def store_news_in_db(articles: List[Dict], db: Session) -> Tuple[int, int]:
                     relevance_score=ts_data["relevance_score"]
                 )
                 db.add(ticker_obj)
-            
+                tagged_tickers.add(ts_data["ticker"].upper())
+
+            # If a force_ticker was provided and not already in the article's ticker list,
+            # add a synthetic association so the article shows up under that ETF.
+            if force_ticker and force_ticker.upper() not in tagged_tickers:
+                synthetic = NewsTicker(
+                    news_id=news_obj.id,
+                    ticker=force_ticker.upper(),
+                    ticker_sentiment_score=article_data["overall_sentiment_score"],
+                    ticker_sentiment_label=article_data["overall_sentiment_label"],
+                    relevance_score=0.3  # moderate — topic-based, not direct mention
+                )
+                db.add(synthetic)
+
             db.commit()
             
         except Exception as e:
@@ -539,16 +560,22 @@ def _build_topics_from_etf(etf: ETF) -> Optional[str]:
     ]
     context = " ".join(text_parts).lower()
 
-    if any(k in context for k in ["tech", "technology", "nasdaq"]):
+    if any(k in context for k in ["tech", "technology", "nasdaq", "semiconductor", "software", "internet"]):
         topic_set.add("technology")
-    if any(k in context for k in ["treasury", "bond", "fixed income", "rate", "income"]):
+    if any(k in context for k in ["treasury", "bond", "fixed income", "rate", "income", "yield"]):
         topic_set.add("economy_monetary")
-    if any(k in context for k in ["macro", "inflation", "gdp", "economic"]):
+    if any(k in context for k in ["macro", "inflation", "gdp", "economic", "federal reserve", "fed"]):
         topic_set.add("economy_macro")
-    if any(k in context for k in ["energy", "oil", "gas"]):
+    if any(k in context for k in ["energy", "oil", "gas", "utilities", "power"]):
         topic_set.add("energy_transportation")
-    if any(k in context for k in ["real estate", "reit"]):
+    if any(k in context for k in ["real estate", "reit", "property"]):
         topic_set.add("real_estate")
+    if any(k in context for k in ["health", "biotech", "pharma", "medical"]):
+        topic_set.add("life_sciences")
+    if any(k in context for k in ["finance", "bank", "insurance", "financial"]):
+        topic_set.add("finance")
+    if any(k in context for k in ["consumer", "retail", "staples", "discretionary"]):
+        topic_set.add("retail_wholesale")
 
     # Keep topic list compact to avoid overly broad fetches.
     selected = sorted(topic_set)[:3]
@@ -584,22 +611,26 @@ def refresh_news_for_single_etf(ticker: str, db: Session) -> Dict[str, int]:
     except Exception as e:
         logger.error(f"❌ Ticker refresh failed for {symbol}: {str(e)}")
 
-    # 2) Metadata-context fetch (topics)
+    # 2) Topic-based fallback fetch (no ticker filter)
+    # Alpha Vantage often doesn't tag sector ETF tickers (e.g. XLK) directly in
+    # ticker_sentiment. Fetching by topics only and then force-associating the ETF
+    # ensures relevant sector/index news appears under this ETF.
     if etf is not None:
         topics = _build_topics_from_etf(etf)
         if topics:
             try:
                 context_data = fetch_news_from_alpha_vantage(
-                    tickers=symbol,
+                    tickers=None,   # topic-only — no ticker filter
                     topics=topics,
                     limit=30,
                     time_from=time_from
                 )
                 stats["api_calls"] += 1
                 context_articles = parse_alpha_vantage_response(context_data)
-                new_count, updated_count = store_news_in_db(context_articles, db)
+                new_count, updated_count = store_news_in_db(context_articles, db, force_ticker=symbol)
                 stats["new_articles"] += new_count
                 stats["updated_articles"] += updated_count
+                logger.info(f"📎 Tagged {new_count} topic-based articles with {symbol}")
             except Exception as e:
                 logger.error(f"❌ Context refresh failed for {symbol} (topics={topics}): {str(e)}")
 
