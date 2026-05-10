@@ -928,12 +928,78 @@ function HoldingsBreakdown({ holdingsData }: { holdingsData: string }) {
 }
 
 // Chatbot Component
+// Simple markdown renderer for bot messages: bold, bullet lists, line breaks
+function BotMessage({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-1 my-1">
+          {listItems.map((item, i) => (
+            <li key={i} dangerouslySetInnerHTML={{ __html: boldify(item) }} />
+          ))}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  const boldify = (text: string) =>
+    text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (/^[-•*] /.test(trimmed)) {
+      listItems.push(trimmed.replace(/^[-•*] /, ''));
+    } else {
+      flushList();
+      if (trimmed === '') {
+        elements.push(<div key={i} className="h-2" />);
+      } else {
+        elements.push(
+          <p key={i} className="my-0.5" dangerouslySetInnerHTML={{ __html: boldify(trimmed) }} />
+        );
+      }
+    }
+  });
+  flushList();
+
+  return <div className="text-sm leading-relaxed">{elements}</div>;
+}
+
 function Chatbot({ etf, onClose }: { etf: ETFDetail; onClose: () => void }) {
   const { token } = useAuth();
   const [messages, setMessages] = useState<{ role: 'user' | 'bot'; content: string }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const buildContext = () => {
+    const fields: string[] = [
+      `Name: ${etf.etf_name} (${etf.ticker})`,
+      etf.issuer ? `Issuer: ${etf.issuer}` : null,
+      etf.category ? `Category: ${etf.category}` : null,
+      etf.asset_class ? `Asset Class: ${etf.asset_class}` : null,
+      etf.general_region ? `Region: ${etf.general_region}` : null,
+      etf.index_tracked ? `Index Tracked: ${etf.index_tracked}` : null,
+      etf.expense_ratio ? `Expense Ratio: ${etf.expense_ratio}` : null,
+      etf.aum ? `AUM: ${etf.aum}` : null,
+      etf.beta ? `Beta: ${etf.beta}` : null,
+      etf.ytd_return ? `YTD Return: ${etf.ytd_return}` : null,
+      etf['1_year_return'] ? `1-Year Return: ${etf['1_year_return']}` : null,
+      etf['3_year_return'] ? `3-Year Return: ${etf['3_year_return']}` : null,
+      etf['5_year_return'] ? `5-Year Return: ${etf['5_year_return']}` : null,
+      etf.standard_deviation ? `Standard Deviation (Risk): ${etf.standard_deviation}` : null,
+      etf.annual_dividend_yield ? `Dividend Yield: ${etf.annual_dividend_yield}` : null,
+      etf['52_week_high'] ? `52-Week High: ${etf['52_week_high']}` : null,
+      etf['52_week_low'] ? `52-Week Low: ${etf['52_week_low']}` : null,
+      etf.top_holdings ? `Top Holdings: ${etf.top_holdings}` : null,
+    ].filter(Boolean) as string[];
+    return fields.join('\n');
+  };
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -947,7 +1013,7 @@ function Chatbot({ etf, onClose }: { etf: ETFDetail; onClose: () => void }) {
         {
           question: input,
           etf_symbol: etf.ticker,
-          etf_context: `ETF: ${etf.etf_name}. Category: ${etf.category}. Asset Class: ${etf.asset_class}. Region: ${etf.general_region}.`,
+          etf_context: buildContext(),
         },
         {
           baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
@@ -981,15 +1047,15 @@ function Chatbot({ etf, onClose }: { etf: ETFDetail; onClose: () => void }) {
           <div className="text-[#71717a] text-sm text-center mt-12">Ask anything about this ETF!</div>
         )}
         {messages.map((msg, i) => (
-          <div key={i} className={`mb-2 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`px-3 py-2 rounded-lg max-w-[80%] text-sm ${msg.role === 'user' ? 'bg-[#0f172a] text-white' : 'bg-[#f8fafc] text-[#0d1117]'}`}>
-              {msg.content}
+          <div key={i} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`px-4 py-3 rounded-xl max-w-[85%] ${msg.role === 'user' ? 'bg-[#0f172a] text-white text-sm' : 'bg-white border border-[#e5e7eb] text-[#0d1117] shadow-sm'}`}>
+              {msg.role === 'bot' ? <BotMessage content={msg.content} /> : msg.content}
             </div>
           </div>
         ))}
         {loading && (
           <div className="flex justify-start mb-2">
-            <div className="px-3 py-2 rounded-lg bg-[#f8fafc] text-[#71717a] text-sm animate-pulse">Thinking...</div>
+            <div className="px-4 py-3 rounded-xl bg-white border border-[#e5e7eb] text-[#71717a] text-sm animate-pulse shadow-sm">Thinking...</div>
           </div>
         )}
       </div>
