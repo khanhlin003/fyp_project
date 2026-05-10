@@ -70,26 +70,72 @@ This review cross-checks documentation against the current codebase implementati
 
 ## Chapter 4 (System Implementation)
 
-### What is good
-- Overall stack direction is accurate (Next.js + FastAPI + Supabase).
-- Implementation sections are well-structured and understandable.
+### Walkthrough Evaluation (Section-by-Section)
 
-### Critical mismatches to fix
-- Frontend stack versions appear outdated relative to code:
-  - Tailwind appears v4 usage pattern in frontend config/readme.
-  - Recharts and other versions should reflect package files, not assumed ranges.
-- Backend Python version note should align with environment docs (project mentions Python 3.11+).
-- External service line says GPT-4o specifically; confirm with deployed config or keep model reference generalized.
-- Risk profiling section states 15 questions and 4 profiles, but current app quiz flow is around 8 questions and outputs conservative, balanced, aggressive.
-- Recommendation engine narrative describes weighted formula with exact component percentages that do not match current route logic (current scoring is rule-based with category/beta/dividend/return/fee bonuses and penalties).
-- Frontend structure snippet includes components/files that may not exist now and omits current modules (wallets, scenarios, app shell patterns).
-- Testing summary in this chapter duplicates Chapter 5 purpose and includes hard counts that should be verified.
+### 4.1 Technology Stack Overview
+- Status: Mostly aligned.
+- Verified alignment:
+  - Frontend stack versions are consistent with package files (Next.js 14.2.5, TypeScript 5.x, Tailwind 4.x, Recharts 3.x, TanStack Query 5.x, Axios 1.x).
+  - Backend runtime is aligned with Python 3.11+ (runtime shows Python 3.11.7).
+  - FastAPI/SQLAlchemy/Pydantic/JWT/bcrypt claims are consistent with backend dependencies.
+- Gaps to fix:
+  - Pandas is documented as 2.x, but dependency currently allows 1.5+.
+  - APScheduler is listed in stack, but implementation evidence should cite where jobs are initialized (not just that the package exists).
 
-### Suggested edit actions
-1. Re-sync all version tables to actual package/dependency files.
-2. Rewrite risk profiling and recommendation sections to match implemented logic exactly.
-3. Update frontend structure and route map to current pages.
-4. Move final testing numbers to Chapter 5 and keep Chapter 4 implementation-focused.
+### 4.2 Data Pipeline Implementation
+- Status: Partially aligned.
+- Strengths:
+  - Multi-source ingestion narrative is coherent and matches project structure.
+  - Incremental update idea and validation stages are appropriate for financial data.
+- Gaps to fix:
+  - Rate-limit numbers are not explicit enough in this section; state the enforced policy directly (per-minute and per-day) and keep it consistent with implementation.
+  - This section currently does not explain operational refresh ownership clearly (what is scheduler-driven vs script-driven), especially for daily news refresh and incremental OHLCV updates.
+
+### 4.3 Backend Implementation
+- Status: Mostly aligned with important wording fixes needed.
+- Strengths:
+  - Modular route/service architecture description is accurate.
+  - Risk profile taxonomy in chapter is now correct (conservative, balanced, aggressive).
+  - Recommendation section now correctly describes rule-based multi-factor scoring.
+- Gaps to fix:
+  - Quiz route comments and payload examples in code still mention 15 questions, while configured quiz now has 8; chapter text should acknowledge current 8-question configuration.
+  - Scenario/VaR section currently emphasizes historical VaR only; implementation also exposes parametric VaR path, so chapter wording should mention both.
+  - Chatbot section currently overstates retrieval grounding. Implemented route sends prompt context but does not describe a full retrieval pipeline.
+  - Minor LaTeX style issue: use \texttt{APIRouter} instead of markdown-style backticks.
+
+### 4.4 Frontend Implementation
+- Status: Aligned.
+- Verified alignment:
+  - Route map includes wallets, scenarios, profile, recommendations, ETF browse/detail.
+  - Project structure reflects current module layout and app-router organization.
+- Minor caution:
+  - Keep structure snippets synchronized when files/components are renamed to avoid future drift.
+
+### 4.5 Implementation Challenges
+- Status: Conceptually good, but evidence needs tightening.
+- Strengths:
+  - Challenges selected are realistic (API limits, data continuity, risk metric stability).
+- Gaps to fix:
+  - Operational numbers (daily update volume, queue throughput, cache horizon) should be explicitly tied to implemented scheduler/service limits.
+
+### 4.6 Deployment Configuration
+- Status: Aligned at high level.
+- Strengths:
+  - Vercel + Render + Supabase separation is clear and correct for architecture communication.
+- Gaps to fix:
+  - If row-level security is claimed, add one sentence on where policy enforcement is configured or narrow the wording to avoid unverifiable claims.
+
+### 4.7 Testing and Evaluation Placement
+- Status: Correct direction.
+- Note:
+  - Keeping Chapter 4 implementation-focused and deferring formal testing results to Chapter 5 is the right structure.
+
+### Suggested edit actions for Chapter 4
+1. Add a short "Implementation Snapshot" table that lists exact pinned versions from frontend package.json, backend requirements, and runtime.
+2. Update quiz narrative to "8-question configuration" and keep taxonomy fixed to conservative, balanced, aggressive.
+3. Update scenario risk text to explicitly state historical and parametric VaR outputs.
+4. Soften chatbot wording from "retrieval-style grounding" to "context-enriched prompting" unless a true retrieval pipeline is implemented.
+5. Add evidence anchors for operational claims (rate limits, scheduler throughput, refresh cadence) in Chapter 5 or appendix.
 
 ## Chapter 5 (Conclusions and Future Work)
 

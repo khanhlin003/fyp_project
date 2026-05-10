@@ -13,11 +13,11 @@ Since 1993, the ETF market has expanded into a diverse ecosystem that includes:
     \item \textbf{Sector and Thematic ETFs:} Focused on specific industries (e.g., Technology) or investment themes (e.g., Clean Energy).
 \end{itemize}
 
-The structural foundation of ETFs lies in the creation and redemption mechanism managed by Authorized Participants (APs). Unlike mutual funds, which are priced only at the end of the trading day based on Net Asset Value (NAV), ETFs allow APs to exchange baskets of underlying securities for ETF shares and vice versa. This arbitrage mechanism ensures that ETF market prices remain closely aligned with their intrinsic value. Compared to traditional mutual funds, ETFs generally offer lower expense ratios, improved tax efficiency, and higher liquidity, although they typically lack discretionary alpha-seeking stock selection.
+The structural foundation of ETFs lies in the creation and redemption mechanism managed by Authorized Participants (APs). Unlike mutual funds, which are priced only at the end of the trading day based on Net Asset Value (NAV), ETFs allow APs to exchange baskets of underlying securities for ETF shares and vice versa. This arbitrage mechanism ensures that ETF market prices remain closely aligned with their intrinsic value \cite{chen2025}. Compared to traditional mutual funds, ETFs generally offer lower expense ratios, improved tax efficiency, and higher liquidity, although they typically lack discretionary alpha-seeking stock selection.
 
 \section{Financial Performance and Risk Metrics}
 
-Evaluating financial instruments requires a multi-dimensional framework that accounts for both return and risk-adjusted performance.
+Evaluating financial instruments requires a multi-dimensional framework that accounts for both return and risk-adjusted performance \cite{segal2025}.
 
 \subsection{Core Performance Metrics}
 
@@ -57,13 +57,13 @@ $\displaystyle ER = \frac{\text{Total Fund Costs}}{\text{Total Fund Assets}}$ \\
 \end{table}
 
 
-The Sharpe Ratio is particularly important for recommendation systems, as it enables comparison between funds with different volatility profiles by normalizing excess return per unit of risk.
+The Sharpe Ratio, originally proposed by Sharpe \cite{sharpe1966}, is particularly important for recommendation systems, as it enables comparison between funds with different volatility profiles by normalizing excess return per unit of risk.
 
 \section{Modern Portfolio Theory and Diversification}
 
-Modern Portfolio Theory (MPT), introduced by Harry Markowitz in 1952, asserts that an investment’s risk and return should be evaluated in the context of its contribution to overall portfolio performance rather than in isolation.
+Modern Portfolio Theory (MPT), introduced by Harry Markowitz in 1952 \cite{markowitz1952}, asserts that an investment’s risk and return should be evaluated in the context of its contribution to overall portfolio performance rather than in isolation.
 
-A central concept of MPT is the \textit{Efficient Frontier}, which represents a set of portfolios offering the maximum expected return for a given level of risk. This framework later led to the Capital Asset Pricing Model (CAPM) developed by William Sharpe in 1964, distinguishing between systematic (market-wide) risk and unsystematic (asset-specific) risk.
+A central concept of MPT is the \textit{Efficient Frontier}, which represents a set of portfolios offering the maximum expected return for a given level of risk. This framework later led to the Capital Asset Pricing Model (CAPM) developed by William Sharpe in 1964 \cite{sharpe1964}, distinguishing between systematic (market-wide) risk and unsystematic (asset-specific) risk.
 
 In the ETF context, MPT provides the theoretical justification for diversification. By combining ETFs with low or negative correlations—such as equities and commodities—investors can reduce unsystematic risk. In this project, MPT principles guide the recommendation engine to ensure that users receive diversified portfolios aligned with their risk tolerance rather than isolated high-performing funds.
 
@@ -71,7 +71,7 @@ In the ETF context, MPT provides the theoretical justification for diversificati
 
 Scenario analysis and stress testing complement historical performance metrics by providing forward-looking risk assessments.
 
-Value at Risk (VaR) is a statistical technique used to estimate the maximum potential loss of a portfolio over a specified time horizon at a given confidence level. Common approaches include:
+Value at Risk (VaR) is a statistical technique used to estimate the maximum potential loss of a portfolio over a specified time horizon at a given confidence level \cite{jorion2006}. Common approaches include:
 
 \begin{itemize}
     \item \textbf{Historical VaR:} Uses ranked historical returns, where the 95th percentile loss represents the VaR.
@@ -79,19 +79,27 @@ Value at Risk (VaR) is a statistical technique used to estimate the maximum pote
     \item \textbf{Monte Carlo Simulation:} Generates thousands of simulated price paths based on historical volatility and drift.
 \end{itemize}
 
-While VaR is widely adopted in industry, it can underestimate extreme tail risks. Therefore, stress testing is essential to simulate historical crises such as the 2008 Global Financial Crisis or the 2020 COVID-19 market crash, allowing investors to evaluate portfolio resilience under severe conditions. In the current implementation of this project, the platform emphasizes historical scenario simulation together with historical and parametric VaR outputs, while Monte Carlo simulation is treated as a future extension.
+While VaR is widely adopted in industry, it has a well-known limitation: it quantifies the threshold loss at a given confidence level but provides no information about the severity of losses that exceed that threshold. To address this, Conditional Value at Risk (CVaR), also known as Expected Shortfall (ES), was introduced as a coherent risk measure \cite{rockafellar2000}. CVaR is defined as the expected loss given that the loss exceeds the VaR threshold:
+
+\[
+    \text{CVaR}_\alpha = \mathbb{E}\bigl[L \mid L \geq \text{VaR}_\alpha\bigr]
+\]
+
+For example, at a 95\% confidence level, VaR answers ``What is the minimum loss in the worst 5\% of scenarios?'' whereas CVaR answers ``What is the average loss across that worst 5\%?'' CVaR is therefore more sensitive to tail risk and is recommended by the Basel III regulatory framework for internal risk models.
+
+In addition to VaR and CVaR, stress testing is essential to simulate historical crises such as the 2008 Global Financial Crisis or the 2020 COVID-19 market crash, allowing investors to evaluate portfolio resilience under severe conditions. In the current implementation of this project, the platform emphasizes historical scenario simulation together with historical and parametric VaR and CVaR outputs, while Monte Carlo simulation is treated as a future extension.
 
 \section{News and Sentiment Analysis in Finance}
 
-The Efficient Market Hypothesis (EMH) posits that asset prices reflect all publicly available information. However, behavioral finance research suggests that investor sentiment influences short-term price movements.
+The Efficient Market Hypothesis (EMH) posits that asset prices reflect all publicly available information \cite{fama1970}. However, behavioral finance research suggests that investor sentiment influences short-term price movements.
 
-Advances in Natural Language Processing (NLP) have enabled the quantification of financial sentiment. Techniques such as the Loughran--McDonald Financial Sentiment Dictionary allow models to distinguish between general negative language and finance-specific negative terminology. Modern APIs leverage transformer-based models to assign sentiment scores ranging from bearish to bullish, providing real-time market insights.
+Advances in Natural Language Processing (NLP) have enabled the quantification of financial sentiment. Techniques such as the Loughran--McDonald Financial Sentiment Dictionary \cite{loughran2011} allow models to distinguish between general negative language and finance-specific negative terminology. Modern APIs leverage transformer-based models to assign sentiment scores ranging from bearish to bullish, providing real-time market insights.
 
 Integrating sentiment analysis into ETF platforms addresses the lag inherent in traditional fundamental data and enables dynamic assessment of thematic trends, such as the impact of regulatory news on sector ETFs.
 
 \section{Recommendation Systems in Finance}
 
-Recommendation systems generally follow three architectural paradigms:
+Recommendation systems generally follow three architectural paradigms \cite{ricci2015}:
 
 \begin{itemize}
     \item \textbf{Content-Based Filtering:} Recommends assets similar to those previously selected by the user.
@@ -103,9 +111,9 @@ In finance, recommendation systems must be constrained by risk-profile alignment
 
 \section{Large Language Models for Financial Applications}
 
-Large Language Models (LLMs) have transformed how users interact with financial data. LLMs enable reasoning, summarization, and natural language explanation of complex financial concepts.
+Large Language Models (LLMs) have transformed how users interact with financial data \cite{bagattiniLLM}. LLMs enable reasoning, summarization, and natural language explanation of complex financial concepts.
 
-Key considerations for LLM integration include prompt engineering versus fine-tuning, mitigation of hallucination risks through Retrieval-Augmented Generation (RAG), and ethical constraints to ensure compliance with financial regulations by emphasizing education rather than direct investment advice.
+Key considerations for LLM integration include prompt engineering versus fine-tuning, mitigation of hallucination risks through Retrieval-Augmented Generation (RAG) \cite{lewis2020}, and ethical constraints to ensure compliance with financial regulations by emphasizing education rather than direct investment advice.
 
 \section{Related Platforms and Comparative Analysis}
 
@@ -113,9 +121,9 @@ A comparative analysis of existing platforms highlights current limitations:
 
 \begin{table}[h]
 \centering
-\small
 \setlength{\tabcolsep}{6pt}
-\begin{tabular}{p{3cm} p{3cm} p{4.5cm} p{4.5cm}}
+{\small
+\begin{tabular}{p{2cm} p{2cm} p{4.5cm} p{4.5cm}}
 \toprule
 \textbf{Platform} & \textbf{Target User} & \textbf{Key Strengths} & \textbf{Limitations} \\
 \midrule
@@ -136,6 +144,7 @@ Free access to broad ETF and market data &
 Information overload; lack of AI-driven insights \\
 \bottomrule
 \end{tabular}
+}
 \caption{Comparison of Existing ETF and Investment Platforms}
 \end{table}
 
@@ -154,6 +163,3 @@ This literature review identifies three key research gaps:
 
 By integrating quantitative risk analytics with LLM-based explanations and sentiment analysis, this project bridges the gap between institutional-grade investment tools and retail-level accessibility.
 
-\section{Implementation Tie-Back}
-
-The design choices in this project are guided by practical implementation constraints and explainability goals for retail users. First, recommendations are generated through risk-profile gating and transparent rule-based scoring, instead of opaque black-box prediction models, so users can understand why an ETF is selected or filtered out. Second, the risk profiling and recommendation flow is aligned to a concise profile taxonomy (conservative, balanced, aggressive) that can be consistently applied across user interface, API logic, and portfolio analytics. Third, risk analysis combines historical stress scenarios with historical and parametric VaR outputs to provide interpretable downside estimates while avoiding over-claiming forecast precision in extreme market regimes. Finally, the LLM assistant is positioned as an educational layer that explains metrics, risks, and rationale in natural language, rather than issuing autonomous investment advice.

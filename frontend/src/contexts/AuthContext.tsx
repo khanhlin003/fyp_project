@@ -108,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(access_token); // Set token in API client
     localStorage.setItem('authToken', access_token);
     localStorage.setItem('authUser', JSON.stringify(userData));
+    localStorage.removeItem('latestQuizResult'); // Clear any previous user's quiz result
   };
 
   const logout = () => {
@@ -116,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(null); // Clear token from API client
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
+    localStorage.removeItem('latestQuizResult');
   };
 
   const updateProfile = async (data: { name?: string; risk_profile?: string }) => {

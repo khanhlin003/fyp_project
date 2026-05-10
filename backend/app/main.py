@@ -100,6 +100,26 @@ app.include_router(chatbot.router, tags=["Chatbot"])
 
 
 # Background Jobs
+def refresh_all_prices_job():
+    """
+    Background job to incrementally refresh OHLCV prices for all ETFs via yfinance.
+    Runs weekdays at 8 PM ET (after market close and data settlement).
+    Batches 50 tickers per yfinance call; skips tickers already up to date.
+    """
+    from app.database import SessionLocal
+    from app.services.price_service import refresh_all_prices
+
+    logger.info("🔄 Starting scheduled price refresh for all ETFs...")
+    db = SessionLocal()
+    try:
+        stats = refresh_all_prices(db)
+        logger.info(f"✅ Price refresh complete: {stats}")
+    except Exception as e:
+        logger.error(f"❌ Price refresh job failed: {str(e)}")
+    finally:
+        db.close()
+
+
 def refresh_top_100_news_job():
     """
     Background job to refresh news for top 100 ETFs
@@ -156,6 +176,15 @@ async def start_scheduler():
     """
     logger.info("🚀 Starting background scheduler...")
     
+    # Schedule daily price refresh at 8 PM ET (weekdays, after market close)
+    scheduler.add_job(
+        refresh_all_prices_job,
+        trigger=CronTrigger(day_of_week="mon-fri", hour=20, minute=0, timezone="US/Eastern"),
+        id="refresh_all_prices",
+        name="Daily All ETFs OHLCV Price Refresh",
+        replace_existing=True,
+    )
+
     # Schedule daily news refresh at 6 PM Eastern Time (after market close)
     scheduler.add_job(
         refresh_top_100_news_job,
@@ -166,7 +195,7 @@ async def start_scheduler():
     )
     
     scheduler.start()
-    logger.info("✅ Scheduler started - Daily news refresh at 6:00 PM ET")
+    logger.info("✅ Scheduler started — price refresh at 8:00 PM ET (weekdays), news refresh at 6:00 PM ET (daily)")
 
 
 @app.on_event("shutdown")

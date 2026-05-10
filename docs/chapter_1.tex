@@ -5,7 +5,7 @@
 
 An exchange-traded fund (ETF) is an investment fund that holds multiple underlying assets such as equities, bonds, commodities, or derivatives and trades on an exchange, much like an individual stock \cite{chen2025, blackrock}. ETFs can be structured to track anything from the price of a commodity to a large and diverse collection of stocks, or even specific investment strategies.
 
-In recent years, Exchange-Traded Funds (ETFs) have emerged as one of the most popular investment vehicles for both retail and institutional investors. As of 2025, the global ETF market has surpassed \$12 trillion in assets under management, with over 10,000 ETFs available worldwide \cite{morgan_etf}. ETFs offer several advantages over traditional mutual funds, including lower expense ratios, intraday trading flexibility, tax efficiency, and transparent holdings disclosure. Compared to individual stocks, ETFs also provide immediate diversification, reducing unsystematic risk while requiring less capital and expertise from investors.
+In recent years, ETFs have emerged as one of the most popular investment vehicles for both retail and institutional investors. As of 2025, the global ETF market has surpassed \$12 trillion in assets under management, with over 10,000 ETFs available worldwide \cite{morgan_etf}. ETFs offer several advantages over traditional mutual funds, including lower expense ratios, intraday trading flexibility, tax efficiency, and transparent holdings disclosure. Compared to individual stocks, ETFs also provide immediate diversification, reducing unsystematic risk while requiring less capital and expertise from investors.
 
 There are various types of ETFs, differentiated by asset class (e.g., equities, bonds, commodities, currencies), investment strategy (passive index tracking, active management, smart beta), sector or theme (technology, healthcare, clean energy), market focus (international, emerging markets), and complexity (leveraged, inverse, synthetic) \cite{chen2025}. For example, an index ETF aims to replicate the performance of a specific benchmark such as the S\&P 500, while an active ETF is managed by professionals seeking to outperform a benchmark. These ETF types are further explained in Chapter~2.
 
@@ -13,20 +13,19 @@ There are various types of ETFs, differentiated by asset class (e.g., equities, 
 
 Despite the rapid expansion and increased accessibility of ETFs, retail investors continue to face several challenges. The large number of ETFs spanning multiple asset classes, geographical regions, and investment strategies can lead to information overload, making it difficult for investors to identify funds that align with their financial goals and risk preferences \cite{efma2024}.
 
-Effective ETF selection also requires an understanding of risk metrics such as beta, volatility, and the Sharpe ratio. However, many retail investors lack the financial literacy needed to accurately interpret these measures, resulting in portfolios that may not reflect their true risk tolerance. Furthermore, ETF performance is influenced by macroeconomic trends, policy decisions, and market news, which retail investors may struggle to interpret and incorporate into timely investment decisions.
+Effective ETF selection also requires an understanding of risk metrics such as beta, volatility, and the Sharpe ratio. However, many retail investors lack the financial literacy needed to accurately interpret these measures, resulting in portfolios that may not reflect their true risk tolerance \cite{lusardi2014}. Furthermore, ETF performance is influenced by macroeconomic trends, policy decisions, and market news, which retail investors may struggle to interpret and incorporate into timely investment decisions \cite{seath2025}.
 
-These challenges are compounded by limited access to professional-grade analytical platforms such as Bloomberg Terminal and Morningstar Direct, which are expensive and primarily designed for institutional users. As a result, retail investors often rely on simplified tools with limited analytical depth.
+These challenges are compounded by limited access to professional-grade analytical platforms such as Bloomberg Terminal and Morningstar Direct, which are expensive and primarily designed for institutional users \cite{seath2025}. As a result, retail investors often rely on simplified tools with limited analytical depth.
 
 \section{Motivation}
 
-Recent advances in Artificial Intelligence (AI) and Large Language Models (LLMs) have created new opportunities to democratize access to financial insights. AI-powered systems can process large volumes of financial data, support personalized recommendations, explain complex concepts in plain language, and analyze news sentiment in real time. In this project, AI is used as an educational decision-support layer, while recommendations are generated through transparent rule-based risk and metric screening rather than autonomous investment advice. By combining these capabilities, the project aims to bridge the gap between professional-grade investment tools and the practical needs of retail investors.
+Recent advances in Artificial Intelligence (AI) and Large Language Models (LLMs) have created new opportunities to democratise access to financial insights. AI-powered systems can process large volumes of financial data, support personalised recommendations, explain complex concepts in plain language, and analyse news sentiment in real time. In this project, AI is used as an educational decision-support layer, while recommendations are generated through transparent rule-based risk and metric screening rather than autonomous investment advice. By combining these capabilities, the project aims to bridge the gap between professional-grade investment tools and the practical needs of retail investors.
 
 \section{Objectives}
 
 The primary objective of this project is to design and implement an AI-assisted ETF recommendation platform that helps retail investors build and manage diversified portfolios aligned with their risk preferences. The specific objectives of the project are as follows:
 
 \begin{itemize}
-    \item Design an AI-assisted ETF recommendation platform for diversified portfolio construction.
     \item Develop a rule-based multi-factor recommendation engine incorporating risk, performance, cost, and liquidity metrics with explainable scoring.
     \item Integrate an AI-powered chatbot to explain ETFs, financial concepts, and recommendations in accessible language.
     \item Aggregate and manage ETF market data and compute key financial and risk metrics on demand.
@@ -50,15 +49,15 @@ The scope of this project includes the following components:
     \item \textbf{Target users:} Retail investors with basic to moderate financial knowledge seeking ETF investment insights.
 \end{itemize}
 
-\section{Report Organization}
+\section{Report Organisation}
 
 This report is organised into the following chapters:
 
 \begin{itemize}
-    \item \textbf{Chapter 1} presents the background, motivation, objectives, scope, and organization of the project.
+    \item \textbf{Chapter 1} presents the background, motivation, objectives, scope, and organisation of the project.
     \item \textbf{Chapter 2} reviews relevant technical concepts including ETFs, risk metrics, and AI/ML applications in finance, and examines existing systems.
     \item \textbf{Chapter 3} describes the system requirements, architecture, database design, API design, and user interface design with supporting diagrams.
     \item \textbf{Chapter 4} details the technology stack, backend and frontend implementation, key algorithms, and integration of AI components.
-    \item \textbf{Chapter 5} summarizes the project outcomes, discusses limitations, and proposes recommendations for future work.
-    \item \textbf{Appendix} provides detailed use case specifications and supplementary design artifacts.
+    \item \textbf{Chapter 5} demonstrates the completed platform through its core user workflows and presents the evaluation results, including API testing, performance benchmarking, frontend audits, and user acceptance testing.
+    \item \textbf{Chapter 6} summarises the project outcomes, discusses limitations, and proposes recommendations for future work.
 \end{itemize}

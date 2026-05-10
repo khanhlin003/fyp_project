@@ -1,0 +1,97 @@
+\chapter{Conclusions and Future Work}
+
+\section{Conclusions}
+
+This project set out to design and implement an AI-assisted ETF recommendation platform that helps retail investors build and manage diversified portfolios aligned with their risk preferences. Evaluating the project against the objectives defined in Chapter~1, the following outcomes were achieved:
+
+\begin{enumerate}
+    \item \textbf{Platform design and implementation.} A full-stack web application was delivered using Next.js~14 (frontend) and FastAPI (backend), deployed on Vercel and Render respectively, with a Supabase-hosted PostgreSQL database. The architecture cleanly separates presentation, application, and data layers, enabling independent scaling and maintenance.
+
+    \item \textbf{Rule-based recommendation engine.} A multi-factor scoring engine was implemented that filters and ranks ETFs according to the user's risk profile (conservative, balanced, or aggressive). Scoring signals include beta alignment, return and dividend heuristics, expense ratio, and category matching, with each recommendation accompanied by human-readable explanations.
+
+    \item \textbf{AI-powered educational chatbot.} An OpenAI-integrated chatbot was deployed on every ETF detail page. Retrieval-style grounding, where live ETF metadata and computed metrics are injected into the prompt context, reduces hallucination risk and keeps responses factually anchored. A financial disclaimer is included in every response.
+
+    \item \textbf{Data aggregation and metrics computation.} The platform ingests data from five external sources (Yahoo Finance, ETFdb, Alpha Vantage, FRED, and OpenAI), covering 2,272 ETFs and over 5.7~million historical OHLCV records. Key financial metrics, including Sharpe ratio, beta, volatility, and maximum drawdown, are computed on demand using vectorized Pandas operations.
+
+    \item \textbf{Risk analysis tools.} Historical scenario replay (e.g., the COVID-19 crash of February--March~2020), uniform stress tests ($-10\%$, $-20\%$, $-30\%$), and both historical and parametric VaR/CVaR at configurable confidence levels (90\%, 95\%, 99\%) were implemented and validated against target response times.
+
+    \item \textbf{Wallet-level portfolio organization.} A purpose-based wallet system allows users to group holdings by investment objective while maintaining separate risk profiles, horizons, and valuation summaries per wallet. Scenario analysis and VaR can be scoped to a single ETF, a wallet, or the full portfolio.
+
+    \item \textbf{Responsive user interface.} The frontend was verified across mobile, tablet, and desktop viewports and achieved Lighthouse scores of 88 (Performance), 91 (Accessibility), 95 (Best Practices), and 92 (SEO).
+
+    \item \textbf{Testing and user validation.} A total of 124 API test cases across 49 endpoints achieved a 100\% pass rate. User acceptance testing with 8~participants yielded an overall satisfaction score of 4.4/5, confirming the platform's usability and educational value.
+\end{enumerate}
+
+Taken together, these results demonstrate that the platform fulfils its stated objectives: providing professional-grade ETF analytics, risk-aware recommendations, and AI-assisted education in a single, accessible interface for retail investors.
+
+% =========================================================
+\section{Limitations}
+
+Despite successful implementation, several technical and functional constraints remain.
+
+\textbf{Market and Data Coverage}
+\begin{itemize}
+    \item The platform covers only U.S.-listed and Singapore-listed ETFs (2,272 funds), excluding European UCITS ETFs, Hong Kong-listed funds, and other emerging-market products. Expanding coverage requires onboarding new data providers, multi-currency normalization, and handling different trading calendars.
+    \item Prices and news follow scheduled batch refresh cycles (daily and monthly) rather than real-time streaming, so intraday movements and breaking events are not immediately reflected. Moving to near real-time would require WebSocket-based data feeds and significant pipeline changes.
+\end{itemize}
+
+\textbf{Analytical Constraints}
+\begin{itemize}
+    \item The recommendation engine uses rule-based scoring with static thresholds and weights. While transparent and explainable, it cannot learn from historical outcomes or adapt to evolving market regimes unlike machine-learning-based approaches.
+    \item Parametric VaR assumes normally distributed returns, which underestimates tail risk during extreme events. Monte Carlo simulation, capable of capturing non-linear and path-dependent risks, has not yet been implemented.
+    \item Portfolio-level VaR aggregates weighted returns but does not explicitly model dynamic cross-asset correlations, which can spike during crises (correlation breakdown) and cause aggregate risk to be underreported.
+\end{itemize}
+
+\textbf{Platform Functionality}
+\begin{itemize}
+    \item The wallet workflow is planning-oriented only; there is no broker API integration, order routing, or real-time position synchronization, so users must execute trades through external platforms.
+    \item The platform does not include collaborative features such as shared portfolios, peer comparison, or community discussion.
+\end{itemize}
+
+\textbf{AI Chatbot}
+\begin{itemize}
+    \item The chatbot depends entirely on the OpenAI API, introducing response latency (averaging 2.5~seconds), ongoing operational costs, and a dependency on third-party availability and pricing changes.
+\end{itemize}
+
+% =========================================================
+\section{Lessons Learned}
+
+The development process yielded several practical insights for building data-intensive financial web applications.
+
+\begin{itemize}
+    \item \textbf{Data quality is the foundation.} Investing early in a robust preprocessing pipeline (gap filling, deduplication, format normalization) prevented downstream errors in charts, metrics, and VaR calculations that would have been far harder to diagnose later.
+    \item \textbf{Design around API rate limits from the start.} Alpha Vantage and Yahoo Finance throttling made naïve sequential refresh infeasible. Proactive decisions---AUM-based prioritization, batch downloads of 50 tickers, and 24-hour deduplication caches---had to be embedded in the architecture upfront rather than retrofitted.
+    \item \textbf{Explainability drives user trust.} UAT participants consistently valued human-readable reason labels (e.g., ``Very low volatility,'' ``Low expense ratio'') over raw scores, reinforcing the importance of transparent, interpretable recommendations.
+    \item \textbf{Modular architecture aids iteration.} Organizing the backend into distinct routers, services, and schemas per domain allowed features like wallet management and scenario analysis to be developed and tested in isolation, reducing integration friction.
+    \item \textbf{Grounding reduces LLM hallucination.} Injecting verified ETF metadata into the chatbot's system prompt substantially improved factual accuracy, offering a lightweight alternative to full RAG pipelines for domain-specific applications.
+    \item \textbf{Test with users early.} The UAT-identified navigation issue with the scenario analysis page was a straightforward fix that could have been caught sooner with lightweight usability reviews at earlier milestones.
+\end{itemize}
+
+% =========================================================
+\section{Future Work}
+
+Future development aims to evolve the platform from an educational analytics tool into a broader investment support ecosystem. Planned enhancements are organized into three time horizons.
+
+\subsection{Short-Term Enhancements}
+\begin{itemize}
+    \item \textbf{Enhanced recommendation personalization:} incorporate user-selected ESG criteria, sector tilts, and dividend-income targets into the scoring engine.
+    \item \textbf{Expanded market coverage:} add European UCITS ETFs, Hong Kong-listed funds, and other major markets with multi-currency normalization and cross-market trading calendar support.
+    \item \textbf{Historical backtesting:} allow users to simulate how a wallet strategy would have performed over a past period, providing empirical evidence for investment decisions.
+\end{itemize}
+
+\subsection{Medium-Term Enhancements}
+\begin{itemize}
+    \item \textbf{Monte Carlo VaR:} complement historical and parametric methods to better capture non-linear risk profiles and path-dependent scenarios.
+    \item \textbf{ML-enhanced recommendations:} transition to a hybrid approach using supervised learning to optimize scoring weights while retaining explainable factor decomposition.
+    \item \textbf{Near real-time data:} integrate WebSocket-based feeds or more frequent polling for intraday portfolio monitoring.
+\end{itemize}
+
+\subsection{Long-Term Vision}
+\begin{itemize}
+    \item \textbf{Native mobile applications:} iOS and Android apps for on-the-go portfolio monitoring and push notifications.
+    \item \textbf{Brokerage API integration:} connect with platforms such as Interactive Brokers or Tiger Brokers for one-click order placement, automated rebalancing, and real-time position synchronization.
+    \item \textbf{Social and collaborative features:} portfolio sharing, peer comparison, and community discussion boards with privacy controls.
+    \item \textbf{Advanced AI capabilities:} fine-tuned financial LLMs, automated weekly portfolio reports, and proactive risk alerts to evolve the chatbot into an intelligent investment co-pilot.
+\end{itemize}
+
+Together, these enhancements chart a path toward a comprehensive investment ecosystem that makes advanced ETF analytics and portfolio management progressively more accessible to retail investors.

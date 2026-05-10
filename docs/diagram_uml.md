@@ -52,6 +52,30 @@ This file records each diagram that should be included or updated based on the c
 	4. Frontend stores token and sets auth header.
 	5. Frontend validates token using profile endpoint.
 
+### PlantUML (Login and Auth Session)
+
+```plantuml
+@startuml
+autonumber
+actor User
+participant "Frontend (AuthContext)" as FE
+participant "Backend Auth API" as AuthAPI
+database "Database" as DB
+
+User -> FE: Submit email + password
+FE -> AuthAPI: POST /auth/login
+AuthAPI -> DB: Validate credentials
+DB --> AuthAPI: User + password hash
+AuthAPI --> FE: 200 OK + JWT
+FE -> FE: Store token and set auth header
+FE -> AuthAPI: GET /auth/me (Bearer token)
+AuthAPI -> DB: Fetch user profile
+DB --> AuthAPI: Profile data
+AuthAPI --> FE: 200 OK + user profile
+FE --> User: Login success + session initialized
+@enduml
+```
+
 ## 5) Sequence Diagram: Risk Quiz to Recommendation
 - Status: Should be added if not present.
 - Participants:
@@ -66,6 +90,28 @@ This file records each diagram that should be included or updated based on the c
 	4. Load recommendation list by profile.
 	5. Render explanation cards.
 
+### PlantUML (Risk Quiz to Recommendation)
+
+```plantuml
+@startuml
+autonumber
+actor User
+participant "Questionnaire Page" as QPage
+participant "Quiz API" as QuizAPI
+participant "Recommendation API" as RecAPI
+
+User -> QPage: Open risk questionnaire
+QPage -> QuizAPI: GET /quiz/questions
+QuizAPI --> QPage: Questions payload
+User -> QPage: Submit answers
+QPage -> QuizAPI: POST /quiz/submit
+QuizAPI --> QPage: Risk profile (conservative/balanced/aggressive)
+QPage -> RecAPI: GET /recommendations?risk_profile=...
+RecAPI --> QPage: Ranked ETF recommendations
+QPage --> User: Display recommendation cards + explanations
+@enduml
+```
+
 ## 6) Sequence Diagram: Portfolio and Wallet Workflow
 - Status: Should be added if not present.
 - Participants:
@@ -75,11 +121,43 @@ This file records each diagram that should be included or updated based on the c
 	- Wallet API
 	- Prices table
 - Flow:
-	1. Add or update holding.
-	2. Optional wallet assignment.
-	3. Fetch latest prices.
-	4. Recompute total value, P/L, and timeseries.
-	5. Display grouped holdings by wallet.
+	1. Select ETF and enter holding details.
+	2. Choose destination: total portfolio only, or a specific wallet.
+	3. Save holding to portfolio.
+	4. If wallet destination is selected, link holding to that wallet.
+	5. Refresh valuation from latest prices.
+	6. Display consolidated portfolio totals and wallet-level breakdown.
+
+### PlantUML (Portfolio and Wallet Workflow)
+
+```plantuml
+@startuml
+autonumber
+actor User
+participant "Portfolio/Wallet Page" as UI
+participant "Portfolio API" as PortfolioAPI
+participant "Wallet API" as WalletAPI
+database "Prices Table" as Prices
+
+User -> UI: Select ETF + enter quantity/cost/date
+UI -> UI: Choose destination (Portfolio only or Wallet)
+UI -> PortfolioAPI: POST /portfolio
+PortfolioAPI --> UI: Holding saved
+
+alt Destination = Wallet
+	UI -> WalletAPI: POST /wallets/{wallet_id}/holdings
+	WalletAPI --> UI: Holding linked to wallet
+else Destination = Portfolio only
+	UI -> UI: No wallet link required
+end
+
+UI -> PortfolioAPI: GET /portfolio/summary
+PortfolioAPI -> Prices: Query latest prices
+Prices --> PortfolioAPI: Current prices
+PortfolioAPI --> UI: Consolidated totals + wallet breakdown + timeseries
+UI --> User: Render total portfolio view and goal-based wallet view
+@enduml
+```
 
 ## 7) Sequence Diagram: Scenario Analysis and VaR
 - Status: Should be added if not present.
@@ -90,11 +168,50 @@ This file records each diagram that should be included or updated based on the c
 	- Scenario service
 	- Prices table
 - Flow:
-	1. Select scenario and target (portfolio/wallet/ETF).
-	2. Resolve holdings.
-	3. Run historical/stress logic.
-	4. Return impact summary and holdings breakdown.
-	5. Run VaR/CVaR calculation on selected target.
+	1. Select analysis target (portfolio, wallet, or ETF).
+	2. Resolve target holdings using one shared target resolver.
+	3. Load historical prices/returns for that target.
+	4. If scenario mode is selected, run stress/historical simulation and return impact.
+	5. If VaR mode is selected, compute VaR/CVaR and return downside-risk metrics.
+	6. Display results with explicit target label.
+
+### PlantUML (Scenario Analysis and VaR)
+
+```plantuml
+@startuml
+autonumber
+actor User
+participant "Scenarios UI" as SUI
+participant "Scenarios API" as SAPI
+participant "Scenario Service" as SVC
+database "Prices Table" as Prices
+
+User -> SUI: Choose target (Portfolio/Wallet/ETF)
+
+group Shared target resolution
+	SUI -> SAPI: Submit target selection
+	SAPI -> SVC: Resolve target holdings
+	SVC -> Prices: Load historical prices and returns
+	Prices --> SVC: Time series data
+end
+
+alt Scenario mode
+	User -> SUI: Run scenario analysis
+	SUI -> SAPI: POST /scenarios/analyze
+	SAPI -> SVC: Apply stress/historical simulation
+	SVC --> SAPI: Impact summary + holdings breakdown
+	SAPI --> SUI: Scenario results
+else VaR mode
+	User -> SUI: Run VaR/CVaR
+	SUI -> SAPI: GET /scenarios/var?target=...
+	SAPI -> SVC: Compute VaR/CVaR on resolved target
+	SVC --> SAPI: VaR/CVaR metrics + interpretation
+	SAPI --> SUI: VaR/CVaR results
+end
+
+SUI --> User: Display results with target label
+@enduml
+```
 
 ## 8) Component Diagram: Frontend Modules
 - Status: Recommended to add.
@@ -111,13 +228,63 @@ This file records each diagram that should be included or updated based on the c
 	- Services (metrics, scenario_service, news_service)
 	- Database models and session layer.
 
-## Diagram Consistency Rules
-- Use consistent naming with code modules.
-- Keep risk profile labels aligned to current implementation: conservative, balanced, aggressive.
-- Avoid legacy labels (moderate, growth) unless explicitly explained as older terminology.
-- Reflect currently implemented authentication boundaries accurately.
+## 10) Activity Diagram: Data Pipeline Flowchart
+- Status: Recommended to add (supports Chapter 4.2).
+- Scope:
+	- Metadata ingestion (ETF metadata sources)
+	- OHLCV ingestion and incremental updates
+	- News sentiment ingestion with rate-limit-aware batching
+	- Validation, normalization, deduplication, and database upsert
+	- Scheduler path (daily news refresh) and script path (incremental OHLCV refresh)
 
-## 10) Ready-to-Use UML Use Case Diagram (PlantUML)
+### PlantUML (Data Pipeline Flowchart)
+
+```plantuml
+@startuml
+top to bottom direction
+skinparam packageStyle rectangle
+
+' ----- Data Sources -----
+package "Data Sources" {
+  [ETFdb + yfinance\n(ETF Metadata)] as etf_meta
+  [yfinance\n(ETF OHLCV Prices)] as etf_prices
+  [Alpha Vantage\n(News Sentiment)] as news
+  [FRED API\n(Macro Indicators)] as macro
+}
+
+' ----- Data Ingestion -----
+package "Data Ingestion" {
+  [Bulk Load (Notebooks)] as bulk
+  [Scheduled Refresh (APScheduler)] as scheduled
+}
+
+' ----- Processing -----
+package "Data Processing" {
+  [Normalize → Deduplicate → Validate → Upsert] as processing
+}
+
+' ----- Database -----
+database "PostgreSQL (Supabase)\n(etfs, etf_prices, news, macro_indicators)" as db
+
+' ----- Connections -----
+etf_meta --> bulk
+etf_prices --> bulk
+news --> bulk
+macro --> bulk
+
+etf_meta --> scheduled
+etf_prices --> scheduled
+news --> scheduled
+macro --> scheduled
+
+bulk --> processing
+scheduled --> processing
+processing --> db
+@enduml
+```
+
+
+## 11) Ready-to-Use UML Use Case Diagram (PlantUML)
 
 Use this directly in your report toolchain or UML editor.
 
@@ -200,7 +367,7 @@ Use this directly in your report toolchain or UML editor.
 		end note
 		@enduml
 
-## 11) Ready-to-Use ER Diagram (PlantUML)
+## 12) Ready-to-Use ER Diagram (PlantUML)
 
 Use this as the source for `entity_relationship_diagram` and export to `docs/fig/entity_relationship_diagram.png`.
 

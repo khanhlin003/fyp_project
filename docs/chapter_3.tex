@@ -8,14 +8,14 @@ The primary users of the AI-Assisted ETFs Recommendation Platform are retail inv
 
 Figure~\ref{fig:usecase} presents the high-level use case diagram illustrating the interactions between users and the system.
 
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{fig/use_case_diagram.png}
     \caption{Use Case Diagram}
     \label{fig:usecase}
 \end{figure}
 
-Detailed use case specifications, including preconditions, main flows, and exception flows, are provided in \textbf{Appendix A}.
+Detailed use case specifications, including preconditions, main flows, and exception flows, are provided in \textbf{Appendix~\ref{appendix:use-cases}}.
 
 \section{Functional Requirements}
 
@@ -79,7 +79,7 @@ The functional requirements specify the core functionalities of the AI-Assisted 
 The system must meet the following non-functional requirements to ensure performance, reliability, security, and usability:
 
 \begin{itemize}
-    \item \textbf{Performance:} Target API response time for common read requests is under 500ms under normal load, and frontend first contentful paint (FCP) target is under 1.5 seconds. Final values should be validated through benchmarking in Chapter 5.
+    \item \textbf{Performance:} Target API response time for common read requests is under 500ms under normal load, and frontend first contentful paint (FCP) target is under 1.5 seconds. 
     \item \textbf{Scalability:} The database shall support millions of price records without significant query degradation.
     \item \textbf{Security:} Passwords shall be hashed; all data in transit shall be encrypted; API keys shall be stored securely on the server side.
     \item \textbf{Reliability:} Background tasks (e.g., data ingestion) shall handle API rate limits and retry on failure.
@@ -97,14 +97,60 @@ The platform follows a modern three-tier architecture:
     \item \textbf{External Integrations:} OpenAI API for the educational chatbot, Alpha Vantage for news sentiment, FRED for macroeconomic indicators, and Yahoo Finance / ETF metadata sources for historical price and reference data.
 \end{itemize}
 
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{fig/system_architecture.png}
     \caption{System Architecture}
     \label{fig:system-arch}
 \end{figure}
 
+\section{Sequence Diagrams}
 
+This section presents key interaction flows across frontend, backend APIs, service logic, and database operations. These sequence diagrams complement the static architecture and show the order of runtime messages for critical user journeys.
+
+\subsection{Login and Auth Session}
+
+The authentication sequence captures credential submission, backend validation, JWT issuance, token persistence in the frontend context, and session verification through the profile endpoint.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig/sequence_login_auth.png}
+    \caption{Sequence Diagram: Login and Auth Session}
+    \label{fig:seq-login-auth}
+\end{figure}
+
+\subsection{Risk Quiz to Recommendation}
+
+This sequence describes how quiz questions are loaded, responses are submitted, a risk profile is calculated, and recommendation results are retrieved and rendered.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig/sequence_quiz_recommendation.png}
+    \caption{Sequence Diagram: Risk Quiz to Recommendation}
+    \label{fig:seq-quiz-recommendation}
+\end{figure}
+
+\subsection{Portfolio and Wallet Workflow}
+
+The portfolio-wallet interaction shows holding creation or updates, optional wallet assignment, price retrieval, recomputation of valuation and P/L, and grouped presentation.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig/sequence_portfolio_wallet.png}
+    \caption{Sequence Diagram: Portfolio and Wallet Workflow}
+    \label{fig:seq-portfolio-wallet}
+\end{figure}
+
+\subsection{Scenario Analysis and VaR}
+
+This sequence outlines how users select scenario targets (portfolio, wallet, or ETF), run scenario impact analysis, and compute VaR/CVaR for downside-risk evaluation.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{fig/sequence_scenario_var.png}
+    \caption{Sequence Diagram: Scenario Analysis and VaR}
+    \label{fig:seq-scenario-var}
+\end{figure} 
 \section{Database Design}
 
 The database schema ensures relational integrity, supports time-series financial data, and facilitates sentiment analysis. It is normalized for data consistency and complex queries across market dimensions:
@@ -129,15 +175,20 @@ Key relationships include one-to-many links from users to portfolios and wallets
     \label{fig:erd}
 \end{figure}
 
-
+ 
 \section{API Design}
 
 The system is built as a RESTful API using FastAPI, following a stateless architecture and standard HTTP methods. All endpoints return data in JSON format and are secured via HTTPS. Protected routes require JWT authentication with a validity of seven days, and passwords are securely hashed using bcrypt. Public data endpoints (for example ETF discovery and recommendation retrieval by profile) are available without authentication, while user-specific operations (portfolio, wallets, profile updates, and chatbot requests) require a valid bearer token. Rate limiting can be enforced at the deployment gateway layer for operational stability.
 
-{\small
-\setlength{\LTpre}{0pt}
-\setlength{\LTpost}{0pt}
-\begin{longtable}{@{}l l l l c@{}}
+% Normal font caption
+
+
+{\scriptsize  % <-- only table content smaller
+\setlength{\LTpre}{6pt}
+\setlength{\LTpost}{6pt}
+
+\begin{longtable}{p{1.2cm} p{1.2cm} p{4.8cm} p{4.8cm} c}
+
 \toprule
 \textbf{Category} & \textbf{Method} & \textbf{Endpoint} & \textbf{Description} & \textbf{Auth} \\
 \midrule
@@ -153,84 +204,54 @@ The system is built as a RESTful API using FastAPI, following a stateless archit
 \endfoot
 
 \bottomrule
-\endlastfoot
+\\[-2pt]
 
 Auth & POST & \texttt{/auth/login} & Authenticate user & No \\
  & POST & \texttt{/auth/signup} & Register new account & No \\
  & GET & \texttt{/auth/me} & Get current user profile & Yes \\
  & PUT & \texttt{/auth/me} & Update current user profile & Yes \\
+
 \midrule
 ETFs & GET & \texttt{/etfs} & List and filter ETFs & No \\
  & GET & \texttt{/etfs/\{ticker\}} & Get ETF metadata & No \\
  & GET & \texttt{/etfs/\{ticker\}/prices} & Get historical prices & No \\
  & GET & \texttt{/etfs/\{ticker\}/metrics} & Get ETF risk/performance metrics & No \\
+
 \midrule
 Portfolio & GET & \texttt{/portfolio} & List user holdings & Yes \\
  & POST & \texttt{/portfolio} & Add holding & Yes \\
  & PUT & \texttt{/portfolio/\{ticker\}} & Update holding & Yes \\
  & DELETE & \texttt{/portfolio/\{ticker\}} & Remove holding & Yes \\
+
 \midrule
 Wallets & GET & \texttt{/wallets} & List user wallets & Yes \\
  & POST & \texttt{/wallets} & Create wallet & Yes \\
  & PUT & \texttt{/wallets/\{wallet\_id\}/profile} & Upsert wallet profile & Yes \\
+
 \midrule
 Analysis & GET & \texttt{/recommendations} & Risk-based recommendations by profile & No \\
  & POST & \texttt{/scenarios/analyze} & Run stress tests & Yes \\
  & GET & \texttt{/scenarios/var} & Calculate VaR/CVaR & Yes \\
  & POST & \texttt{/chatbot} & AI assistant query & Yes \\
+
 \midrule
 Market & GET & \texttt{/macro/indicators} & Economic indicators & No \\
+
 \midrule
 News & GET & \texttt{/news/ticker/\{ticker\}} & News and sentiment for ETF & No \\
- & GET & \texttt{/news/portfolio/\{user\_id\}} & News for user's portfolio & No \\
- & GET & \texttt{/news/alerts/\{user\_id\}} & News alerts for user & No \\
-\caption{Summary of Core API Endpoints}\label{tab:api-endpoints}\\
+ & GET & \texttt{/news/portfolio/\{user\_id\}} & News for user's portfolio & Yes \\
+ & GET & \texttt{/news/alerts/\{user\_id\}} & News alerts for user & Yes \\
+
 \end{longtable}
 }
 
+\captionof{table}{Summary of Core API Endpoints}
+\label{tab:api-endpoints}
 
 \section{User Interface Design}
 
-The platform includes the following key user interfaces. For clarity and consistency in the report, each figure should capture one representative page state with realistic sample data and visible primary actions. The recommended mapping is:
+The platform includes the following key user interfaces. Core screens are illustrated in the figures below, while additional implemented pages (wallet management, scenario analysis, and profile settings) extend the operational workflow.
 
-\begin{itemize}
-    \item Figure~\ref{fig:landing}: Public landing page (route: \texttt{/}) showing hero section, key value proposition, and call-to-action buttons.
-    \item Figure~\ref{fig:questionnaire}: Risk questionnaire page (route: \texttt{/questionnaire}) with progress indicator and one or more answered questions.
-    \item Figure~\ref{fig:recommendation_result}: Recommendation results page (route: \texttt{/recommendations}) with selected profile and ranked ETF cards.
-    \item Figure~\ref{fig:dashboard}: Portfolio dashboard (route: \texttt{/portfolio}) showing holdings summary, performance, and allocation visualization.
-    \item Figure~\ref{fig:etf_explorer}: ETF discovery page (route: \texttt{/etfs}) with active search/filter controls and populated results.
-    \item Figure~\ref{fig:etf_details}: ETF details page (route: \texttt{/etfs/[ticker]}) showing chart, metrics, news, and chatbot entry point.
-\end{itemize}
-
-To avoid visual ambiguity, each screenshot should include the top navigation/header and at least one primary interaction element (for example search bar, profile selector, add-holding action, or scenario action button).
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{fig/landing_page_ui.png}
-    \caption{Landing Page UI}
-    \label{fig:landing}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{fig/risk_questionnaire_ui.png}
-    \caption{Risk Assessment Questionnaire UI}
-    \label{fig:questionnaire}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{fig/personalize_rec.png}
-    \caption{ETF Recommendation Result UI}
-    \label{fig:recommendation_result}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{fig/user_portfolio.png}
-    \caption{User Portfolio Dashboard UI}
-    \label{fig:dashboard}
-\end{figure}
 
 \begin{figure}[H]
     \centering
@@ -246,11 +267,36 @@ To avoid visual ambiguity, each screenshot should include the top navigation/hea
     \label{fig:etf_details}
 \end{figure}
 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/risk_questionnaire_ui.png}
+    \caption{Risk Assessment Questionnaire UI}
+    \label{fig:questionnaire}
+\end{figure}
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.6\textwidth]{fig/personalize_rec.png}
+    \caption{ETF Recommendation Result UI}
+    \label{fig:recommendation_result}
+\end{figure}
+
+
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\textwidth]{fig/wallet_details_ui.png}
     \caption{Wallet Details Page UI}
     \label{fig:wallet_details}
+\end{figure}
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig/user_portfolio.png}
+    \caption{User Portfolio Dashboard UI}
+    \label{fig:dashboard}
 \end{figure}
 
 \begin{figure}[H]
@@ -259,13 +305,4 @@ To avoid visual ambiguity, each screenshot should include the top navigation/hea
     \caption{Scenario Analysis and VaR UI}
     \label{fig:scenario_var}
 \end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.85\textwidth]{fig/profile_settings_ui.png}
-    \caption{Profile Settings Page UI}
-    \label{fig:profile_settings}
-\end{figure}
-
-These additional screens cover wallet management (route: \texttt{/wallets}), target-based risk analysis (route: \texttt{/scenarios}), and user profile maintenance (route: \texttt{/profile}).
 
