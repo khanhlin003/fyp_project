@@ -3,9 +3,11 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 from openai import OpenAI
+from sqlalchemy.orm import Session
 
-# Import auth from the main auth module
 from app.auth import get_current_user
+from app.database import get_db
+from app.services.news_service import get_news_for_ticker
 
 router = APIRouter()
 
@@ -34,12 +36,30 @@ Rules for every response:
 - End with one short "Bottom line:" sentence summarising the key point."""
 
 @router.post("/chatbot", response_model=ChatResponse)
-def ask_chatbot(request: ChatRequest, user=Depends(get_current_user)):
+def ask_chatbot(request: ChatRequest, user=Depends(get_current_user), db: Session = Depends(get_db)):
     if not OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key not configured.")
 
     context_block = f"ETF Data:\n{request.etf_context}" if request.etf_context else ""
-    user_message = f"{context_block}\n\nUser question: {request.question}".strip()
+
+    # Inject recent news headlines + sentiment if a ticker is provided
+    news_block = ""
+    if request.etf_symbol:
+        try:
+            articles = get_news_for_ticker(request.etf_symbol.upper(), db, limit=5, days=7)
+            if articles:
+                lines = ["Recent News (last 7 days):"]
+                for a in articles:
+                    label = a.overall_sentiment_label or "Neutral"
+                    score = f"{a.overall_sentiment_score:.2f}" if a.overall_sentiment_score is not None else "N/A"
+                    summary = (a.summary or "")[:200].strip()
+                    lines.append(f"- [{label}, score {score}] {a.title}. {summary}")
+                news_block = "\n".join(lines)
+        except Exception:
+            pass  # News is supplementary; don't fail the whole request
+
+    parts = [p for p in [context_block, news_block] if p]
+    user_message = "\n\n".join(parts + [f"User question: {request.question}"]).strip()
 
     try:
         response = client.chat.completions.create(
